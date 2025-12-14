@@ -1,1 +1,6 @@
-��^�j�W�v+-n�t"���
+node_modules
+dist
+.git
+.env
+uploads
+npm-debug.log
