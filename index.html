@@ -1,0 +1,230 @@
+
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>سامانه جهان امید سلامت</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Vazirmatn', 'sans-serif'],
+            },
+            colors: {
+              luxury: {
+                900: '#0f172a', // Midnight
+                800: '#1e3a8a', // Deep Blue
+                700: '#172554', 
+                600: '#1e40af',
+                500: '#3b82f6', // Bright Blue
+                gold: '#fbbf24'
+              }
+            },
+            animation: {
+              'gradient-xy': 'gradient-xy 15s ease infinite',
+              'float-1': 'float-1 8s ease-in-out infinite',
+              'float-2': 'float-2 12s ease-in-out infinite',
+              'float-3': 'float-3 10s ease-in-out infinite',
+              'pulse-glow': 'pulse-glow 4s ease-in-out infinite',
+              'pop': 'pop 0.3s ease-out forwards',
+              'fade-in': 'fadeIn 0.5s ease-out forwards',
+              'spin-slow': 'spin 8s linear infinite',
+            },
+            keyframes: {
+              'gradient-xy': {
+                '0%, 100%': { 'background-position': '0% 50%' },
+                '50%': { 'background-position': '100% 50%' },
+              },
+              'float-1': {
+                '0%, 100%': { transform: 'translate(0, 0) rotate(0deg)' },
+                '33%': { transform: 'translate(30px, -50px) rotate(10deg)' },
+                '66%': { transform: 'translate(-20px, 20px) rotate(-5deg)' },
+              },
+              'float-2': {
+                '0%, 100%': { transform: 'translate(0, 0) rotate(0deg)' },
+                '50%': { transform: 'translate(-30px, -60px) rotate(-10deg)' },
+              },
+              'float-3': {
+                '0%, 100%': { transform: 'translate(0, 0) scale(1)' },
+                '50%': { transform: 'translate(20px, -40px) scale(1.1)' },
+              },
+              'pulse-glow': {
+                '0%, 100%': { opacity: 0.6, transform: 'scale(1)' },
+                '50%': { opacity: 1, transform: 'scale(1.1)' },
+              },
+              'pop': {
+                '0%': { transform: 'scale(1)', opacity: 1 },
+                '100%': { transform: 'scale(1.5)', opacity: 0 },
+              },
+              'fadeIn': {
+                'from': { opacity: 0, transform: 'scale(0.95)' },
+                'to': { opacity: 1, transform: 'scale(1)' },
+              }
+            }
+          }
+        }
+      }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;700;900&family=Lalezar&display=swap" rel="stylesheet">
+    <style>
+      :root {
+        /* Luxury Light: Platinum/Silver/Soft Blue */
+        --bg-gradient-light: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 50%, #cbd5e1 100%);
+        
+        /* Luxury Dark: Deep Midnight Blue / Royal Blue */
+        --bg-gradient-dark: linear-gradient(135deg, #020617 0%, #172554 40%, #1e3a8a 100%);
+      }
+
+      body {
+        font-family: 'Vazirmatn', sans-serif;
+        min-height: 100vh;
+        transition: color 0.5s ease;
+        background-image: var(--bg-gradient-light);
+        background-attachment: fixed;
+      }
+      
+      body.dark {
+        background-image: var(--bg-gradient-dark);
+        color: #e2e8f0;
+      }
+
+      /* Custom Scrollbar - Sleek */
+      ::-webkit-scrollbar {
+        width: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent; 
+      }
+      ::-webkit-scrollbar-thumb {
+        background: rgba(59, 130, 246, 0.5); 
+        border-radius: 20px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: rgba(59, 130, 246, 0.8); 
+      }
+      
+      .custom-scrollbar::-webkit-scrollbar {
+        width: 6px;
+      }
+
+      /* Luxury Glassmorphism */
+      .glass-panel {
+        background: rgba(255, 255, 255, 0.85); 
+        backdrop-filter: blur(20px) saturate(120%);
+        -webkit-backdrop-filter: blur(20px) saturate(120%);
+        border: 1px solid rgba(255, 255, 255, 0.6); 
+        box-shadow: 0 20px 50px -10px rgba(0, 0, 0, 0.1);
+        color: #0f172a;
+      }
+      
+      .dark .glass-panel {
+        background: rgba(15, 23, 42, 0.6); 
+        backdrop-filter: blur(25px) saturate(180%);
+        -webkit-backdrop-filter: blur(25px) saturate(180%);
+        border: 1px solid rgba(255, 255, 255, 0.1); 
+        box-shadow: 0 15px 40px -5px rgba(0, 0, 0, 0.4), 0 0 30px rgba(30, 64, 175, 0.2);
+        color: #e2e8f0;
+      }
+
+      .glass-card {
+        background: rgba(255, 255, 255, 0.7);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.5);
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+      }
+      
+      .dark .glass-card {
+        background: rgba(30, 58, 138, 0.3); /* Blue tint */
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow: 0 4px 16px 0 rgba(0, 0, 0, 0.3);
+      }
+
+      .animate-fade-in {
+        animation: fadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      }
+      
+      /* Input Styles */
+      input, select, textarea {
+        transition: all 0.3s ease;
+      }
+      input:focus, select:focus, textarea:focus {
+        transform: translateY(-1px);
+        box-shadow: 0 10px 20px -5px rgba(59, 130, 246, 0.3);
+      }
+
+      /* Fix Select Option Colors in Dark Mode */
+      option {
+         background-color: white;
+         color: black;
+      }
+      .dark option {
+         background-color: #1e3a8a;
+         color: white;
+      }
+
+      /* Print Styles */
+      @media print {
+        @page {
+            size: A5 portrait; /* Changed to portrait for flyer style */
+            margin: 0;
+        }
+        body {
+          background: white !important;
+          color: black !important;
+          width: 100%;
+          height: 100%;
+          -webkit-print-color-adjust: exact !important; /* Ensure colors print */
+          print-color-adjust: exact !important;
+        }
+        .no-print {
+          display: none !important;
+        }
+        .glass-panel, .glass-card {
+          box-shadow: none !important;
+          border: none !important;
+          background: white !important;
+          color: black !important;
+          backdrop-filter: none !important;
+        }
+        .print-only {
+          display: block !important;
+        }
+        /* Ensure full page use */
+        #root {
+            width: 100%;
+            height: 100%;
+        }
+        canvas, svg {
+            break-inside: avoid;
+        }
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.554.0",
+    "react-router-dom": "https://aistudiocdn.com/react-router-dom@^7.9.6",
+    "recharts": "https://aistudiocdn.com/recharts@^3.4.1",
+    "jspdf": "https://aistudiocdn.com/jspdf@^3.0.4",
+    "html2canvas": "https://aistudiocdn.com/html2canvas@^1.4.1",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.0/package/xlsx.mjs",
+    "jalaali-js": "https://aistudiocdn.com/jalaali-js@^1.2.6",
+    "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.1.1",
+    "vite": "https://aistudiocdn.com/vite@^7.2.6"
+  }
+}
+</script>
+</head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>

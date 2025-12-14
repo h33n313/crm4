@@ -1,0 +1,7 @@
+{
+  "name": "نسخه دوم پابلیش گیتهاب",
+  "description": "سامانه جامع مدیریت بازخورد بیماران با برند جهان امید سلامت",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
