@@ -82,11 +82,18 @@ const Login: React.FC = () => {
       }
   };
 
-  // Grouping Logic for Requested Hierarchy
-  const mainManagers = users.filter(u => ['matlabi', 'kand', 'mahlouji'].includes(u.username)); // Added Mahlouji
-  const supervisors = users.filter(u => ['mostafavi'].includes(u.username));
-  // Other admins or staff who are not in the above groups
-  const staff = users.filter(u => !['matlabi', 'kand', 'mahlouji', 'mostafavi'].includes(u.username)); // Added Mahlouji
+  // Grouping Logic for Requested Hierarchy - SORTED BY ORDER
+  const mainManagers = users
+    .filter(u => ['matlabi', 'kand', 'mahlouji'].includes(u.username))
+    .sort((a,b) => (a.order || 99) - (b.order || 99));
+    
+  const supervisors = users
+    .filter(u => ['mostafavi'].includes(u.username))
+    .sort((a,b) => (a.order || 99) - (b.order || 99));
+    
+  const staff = users
+    .filter(u => !['matlabi', 'kand', 'mahlouji', 'mostafavi'].includes(u.username))
+    .sort((a,b) => (a.order || 99) - (b.order || 99));
 
   if (loading) return <div className="min-h-screen flex items-center justify-center text-emerald-600 dark:text-emerald-400 font-bold text-xl">در حال بارگذاری...</div>;
 
@@ -152,8 +159,6 @@ const Login: React.FC = () => {
       )}
 
       <div className="flex-1 flex items-center justify-center p-4 md:p-8 z-10 relative">
-        
-        {/* Floating Developer Gear */}
         <button 
             onClick={() => { setShowDevLogin(true); setError(''); setDevPasswordInput(''); }}
             className="absolute bottom-6 left-6 p-3 bg-white/10 hover:bg-emerald-500 text-slate-400 hover:text-white backdrop-blur-md rounded-full transition-all shadow-lg hover:rotate-90 z-50 border border-white/10"
@@ -184,7 +189,7 @@ const Login: React.FC = () => {
                         </h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {mainManagers.map(user => (
-                                <UserCard key={user.id} user={user} onClick={() => handleUserClick(user)} roleLabel="مدیر اصلی" />
+                                <UserCard key={user.id} user={user} onClick={() => handleUserClick(user)} roleLabel={user.title || "مدیر اصلی"} />
                             ))}
                         </div>
                     </div>
@@ -198,7 +203,7 @@ const Login: React.FC = () => {
                         </h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {supervisors.map(user => (
-                                <UserCard key={user.id} user={user} onClick={() => handleUserClick(user)} roleLabel="سوپروایزر" />
+                                <UserCard key={user.id} user={user} onClick={() => handleUserClick(user)} roleLabel={user.title || "سوپروایزر"} />
                             ))}
                         </div>
                     </div>
@@ -212,7 +217,7 @@ const Login: React.FC = () => {
                         </h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             {staff.map(user => (
-                                <UserCard key={user.id} user={user} onClick={() => handleUserClick(user)} roleLabel={user.role === 'admin' ? 'مدیر' : 'پرسنل'} />
+                                <UserCard key={user.id} user={user} onClick={() => handleUserClick(user)} roleLabel={user.title || (user.role === 'admin' ? 'مدیر' : 'پرسنل')} />
                             ))}
                         </div>
                     </div>
@@ -220,7 +225,6 @@ const Login: React.FC = () => {
 
             </div>
             
-            {/* Background decoration */}
             <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/5 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none"></div>
             <div className="absolute bottom-0 left-0 w-64 h-64 bg-blue-500/5 rounded-full blur-3xl -ml-20 -mb-20 pointer-events-none"></div>
 

@@ -22,10 +22,7 @@ const DeveloperPanel: React.FC = () => {
     const [isConnected, setIsConnected] = useState<boolean>(false);
     const [systemLogs, setSystemLogs] = useState<any[]>([]);
     
-    const [testOpenaiStatus, setTestOpenaiStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
     const [testIOTypeStatus, setTestIOTypeStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
-    const [testTalkBotStatus, setTestTalkBotStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
-    const [testGroqStatus, setTestGroqStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
     const [testGeminiStatus, setTestGeminiStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
     
     const [editingQuestion, setEditingQuestion] = useState<Partial<SurveyQuestion> | null>(null);
@@ -34,7 +31,6 @@ const DeveloperPanel: React.FC = () => {
     const [editingUser, setEditingUser] = useState<Partial<AppUser> | null>(null);
     const [showUserModal, setShowUserModal] = useState(false);
     
-    // Backup State
     const [isRestoring, setIsRestoring] = useState(false);
 
     const AVAILABLE_ICONS = ['Stethoscope', 'Activity', 'Thermometer', 'Heart', 'Pill', 'ShieldPlus', 'Syringe', 'Brain', 'Dna'];
@@ -82,27 +78,6 @@ const DeveloperPanel: React.FC = () => {
         }
     };
 
-    const testOpenaiApi = async () => {
-        setTestOpenaiStatus('loading');
-        try {
-            if(settings) await saveSettings(settings);
-            const res = await fetch('/api/test-openai', { method: 'POST' });
-            const data = await res.json();
-            if (res.ok) {
-                setTestOpenaiStatus('success');
-                showMessage('ارتباط با OpenAI موفقیت‌آمیز بود');
-            } else {
-                setTestOpenaiStatus('error');
-                alert('خطا در OpenAI: ' + (data.error || 'Unknown Error'));
-            }
-        } catch (e: any) {
-            setTestOpenaiStatus('error');
-            alert('خطای شبکه: ' + e.message);
-        } finally {
-            setTimeout(() => setTestOpenaiStatus('idle'), 3000);
-        }
-    };
-
     const testIOTypeApi = async () => {
         setTestIOTypeStatus('loading');
         try {
@@ -121,48 +96,6 @@ const DeveloperPanel: React.FC = () => {
             alert('خطای شبکه: ' + e.message);
         } finally {
             setTimeout(() => setTestIOTypeStatus('idle'), 3000);
-        }
-    };
-
-    const testTalkBotApi = async () => {
-        setTestTalkBotStatus('loading');
-        try {
-            if(settings) await saveSettings(settings);
-            const res = await fetch('/api/test-talkbot', { method: 'POST' });
-            const data = await res.json();
-            if (res.ok) {
-                setTestTalkBotStatus('success');
-                showMessage('ارتباط با TalkBot موفقیت‌آمیز بود');
-            } else {
-                setTestTalkBotStatus('error');
-                alert('خطا در TalkBot: ' + (data.error || 'Unknown Error'));
-            }
-        } catch (e: any) {
-            setTestTalkBotStatus('error');
-            alert('خطای شبکه: ' + e.message);
-        } finally {
-            setTimeout(() => setTestTalkBotStatus('idle'), 3000);
-        }
-    };
-
-    const testGroqApi = async () => {
-        setTestGroqStatus('loading');
-        try {
-            if(settings) await saveSettings(settings);
-            const res = await fetch('/api/test-groq', { method: 'POST' });
-            const data = await res.json();
-            if (res.ok) {
-                setTestGroqStatus('success');
-                showMessage('ارتباط با Groq موفقیت‌آمیز بود');
-            } else {
-                setTestGroqStatus('error');
-                alert('خطا در Groq: ' + (data.error || 'Unknown Error'));
-            }
-        } catch (e: any) {
-            setTestGroqStatus('error');
-            alert('خطای شبکه: ' + e.message);
-        } finally {
-            setTimeout(() => setTestGroqStatus('idle'), 3000);
         }
     };
 
@@ -187,6 +120,27 @@ const DeveloperPanel: React.FC = () => {
         }
     };
 
+    // --- Gemini Key Management ---
+    const addGeminiKey = () => {
+        if (!settings) return;
+        const newKeys = [...(settings.geminiApiKeys || []), ''];
+        setSettings({...settings, geminiApiKeys: newKeys});
+    };
+
+    const removeGeminiKey = (index: number) => {
+        if (!settings) return;
+        const newKeys = [...(settings.geminiApiKeys || [])];
+        newKeys.splice(index, 1);
+        handleSave({...settings, geminiApiKeys: newKeys});
+    };
+
+    const updateGeminiKey = (index: number, val: string) => {
+        if (!settings) return;
+        const newKeys = [...(settings.geminiApiKeys || [])];
+        newKeys[index] = val;
+        setSettings({...settings, geminiApiKeys: newKeys});
+    };
+
     const saveUser = () => {
         if (!settings || !editingUser) return;
         if (!editingUser.username || !editingUser.name) return alert('نام و نام کاربری الزامی است');
@@ -199,6 +153,8 @@ const DeveloperPanel: React.FC = () => {
             name: editingUser.name!,
             username: editingUser.username!,
             role: editingUser.role || 'staff',
+            title: editingUser.title || (editingUser.role === 'admin' ? 'مدیر' : 'پرسنل'),
+            order: editingUser.order || 99,
             isPasswordEnabled: editingUser.isPasswordEnabled || false,
             password: editingUser.password || '',
             avatarColor: editingUser.avatarColor || 'bg-slate-500'
@@ -309,19 +265,14 @@ const DeveloperPanel: React.FC = () => {
         reader.readAsBinaryString(file);
     };
 
-    // --- NEW DIRECT DOWNLOAD HANDLER ---
-    // This bypasses the fetch -> blob -> download process which fails on large files/sandboxes
     const handleFullBackup = () => {
         if (!confirm('این عملیات تمام تنظیمات، فرم‌ها و فایل‌های صوتی را دانلود می‌کند. ممکن است کمی طول بکشد. ادامه می‌دهید؟')) return;
-        
-        // Create a temporary hidden link and click it
         const link = document.createElement("a");
         link.href = "/api/full-backup";
-        link.target = "_blank"; // Optional: opens in new tab if needed, but for download usually triggers save
+        link.target = "_blank"; 
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        
         logAction('INFO', 'درخواست دانلود بکاپ کامل ارسال شد');
     };
 
@@ -352,7 +303,6 @@ const DeveloperPanel: React.FC = () => {
         reader.readAsText(file);
     };
 
-
     if (!settings) return <div className="p-10 text-center text-slate-500 font-bold">در حال بارگذاری پنل...</div>;
 
     const sortedQuestions = [...settings.questions].sort((a,b) => a.order - b.order);
@@ -372,6 +322,7 @@ const DeveloperPanel: React.FC = () => {
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                    {/* Sidebar Tabs */}
                     <div className="glass-panel p-4 rounded-3xl h-fit flex flex-row lg:flex-col gap-2 overflow-x-auto">
                         {[
                             {id: 'users', icon: UserPlus, label: 'مدیریت کاربران'},
@@ -392,47 +343,7 @@ const DeveloperPanel: React.FC = () => {
                     </div>
 
                     <div className="lg:col-span-3">
-                        
-                        {activeTab === 'questions' && (
-                            <div className="glass-panel p-6 rounded-3xl animate-fade-in">
-                                <div className="flex justify-between items-center mb-6">
-                                    <h2 className="text-2xl font-black text-slate-800 dark:text-white flex items-center gap-2">
-                                        <List className="w-6 h-6"/> مدیریت سوالات
-                                    </h2>
-                                    <button 
-                                        onClick={() => { setEditingQuestion({}); setShowQuestionModal(true); }}
-                                        className="bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold flex items-center gap-2 hover:bg-emerald-700 shadow-lg"
-                                    >
-                                        <Plus className="w-5 h-5"/> افزودن سوال
-                                    </button>
-                                </div>
-
-                                <div className="space-y-3">
-                                    {sortedQuestions.map((q, idx) => (
-                                        <div key={q.id} className="bg-white/60 dark:bg-slate-800/60 p-4 rounded-2xl flex items-center gap-4 border border-slate-200 dark:border-slate-700 transition-all hover:border-blue-400">
-                                            <div className="flex flex-col gap-1">
-                                                <button onClick={() => moveQuestion(idx, 'up')} disabled={idx === 0} className="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 rounded disabled:opacity-30"><ArrowUp className="w-4 h-4"/></button>
-                                                <button onClick={() => moveQuestion(idx, 'down')} disabled={idx === sortedQuestions.length - 1} className="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 rounded disabled:opacity-30"><ArrowDown className="w-4 h-4"/></button>
-                                            </div>
-                                            <div className="flex-1">
-                                                <p className="font-bold text-slate-800 dark:text-white">{q.text}</p>
-                                                <div className="flex gap-2 mt-1 text-xs font-bold text-slate-500">
-                                                    <span className="bg-blue-100 dark:bg-blue-900/30 text-blue-600 px-2 py-0.5 rounded">{q.type}</span>
-                                                    <span className="bg-purple-100 dark:bg-purple-900/30 text-purple-600 px-2 py-0.5 rounded">{q.category}</span>
-                                                    {q.visibility === 'staff_only' && <span className="bg-orange-100 dark:bg-orange-900/30 text-orange-600 px-2 py-0.5 rounded">فقط پرسنل</span>}
-                                                </div>
-                                            </div>
-                                            <div className="flex gap-2">
-                                                <button onClick={() => { setEditingQuestion(q); setShowQuestionModal(true); }} className="p-2 text-blue-500 hover:bg-blue-50 rounded-xl"><Edit2 className="w-5 h-5"/></button>
-                                                <button onClick={() => deleteQuestion(q.id, q.text)} className="p-2 text-red-500 hover:bg-red-50 rounded-xl"><Trash2 className="w-5 h-5"/></button>
-                                            </div>
-                                        </div>
-                                    ))}
-                                    {sortedQuestions.length === 0 && <div className="text-center py-10 text-slate-400">هیچ سوالی تعریف نشده است</div>}
-                                </div>
-                            </div>
-                        )}
-
+                        {/* Users Tab */}
                         {activeTab === 'users' && (
                             <div className="glass-panel p-6 rounded-3xl animate-fade-in">
                                 <div className="flex justify-between items-center mb-6">
@@ -454,7 +365,10 @@ const DeveloperPanel: React.FC = () => {
                                                 <div className={`w-10 h-10 rounded-full ${u.avatarColor || 'bg-slate-500'} flex items-center justify-center text-white font-bold`}>{u.name.charAt(0)}</div>
                                                 <div>
                                                     <p className="font-bold text-slate-800 dark:text-white">{u.name}</p>
-                                                    <p className="text-xs text-slate-500 dark:text-slate-400">{u.username} • {u.role === 'admin' ? 'مدیر' : u.role === 'staff' ? 'پرسنل' : 'مهمان'}</p>
+                                                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                                                        {u.username} • <span className="text-blue-500 font-bold">{u.title || (u.role === 'admin' ? 'مدیر' : u.role === 'staff' ? 'پرسنل' : 'مهمان')}</span>
+                                                    </p>
+                                                    {u.order && <p className="text-[10px] text-slate-400">اولویت: {u.order}</p>}
                                                 </div>
                                             </div>
                                             <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -466,187 +380,75 @@ const DeveloperPanel: React.FC = () => {
                                 </div>
                             </div>
                         )}
+                        
+                        {/* Questions Tab */}
+                        {activeTab === 'questions' && (
+                             <div className="glass-panel p-6 rounded-3xl animate-fade-in">
+                                <div className="flex justify-between items-center mb-6">
+                                    <h2 className="text-2xl font-black text-slate-800 dark:text-white flex items-center gap-2"><List className="w-6 h-6"/> مدیریت سوالات</h2>
+                                    <button onClick={() => { setEditingQuestion({}); setShowQuestionModal(true); }} className="bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold flex items-center gap-2 hover:bg-emerald-700 shadow-lg"><Plus className="w-5 h-5"/> افزودن سوال</button>
+                                </div>
+                                <div className="space-y-3">
+                                    {sortedQuestions.map((q, idx) => (
+                                        <div key={q.id} className="bg-white/60 dark:bg-slate-800/60 p-4 rounded-2xl flex items-center gap-4 border border-slate-200 dark:border-slate-700 transition-all hover:border-blue-400">
+                                            <div className="flex flex-col gap-1"><button onClick={() => moveQuestion(idx, 'up')} disabled={idx === 0} className="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 rounded disabled:opacity-30"><ArrowUp className="w-4 h-4"/></button><button onClick={() => moveQuestion(idx, 'down')} disabled={idx === sortedQuestions.length - 1} className="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 rounded disabled:opacity-30"><ArrowDown className="w-4 h-4"/></button></div>
+                                            <div className="flex-1"><p className="font-bold text-slate-800 dark:text-white">{q.text}</p><div className="flex gap-2 mt-1 text-xs font-bold text-slate-500"><span className="bg-blue-100 dark:bg-blue-900/30 text-blue-600 px-2 py-0.5 rounded">{q.type}</span><span className="bg-purple-100 dark:bg-purple-900/30 text-purple-600 px-2 py-0.5 rounded">{q.category}</span>{q.visibility === 'staff_only' && <span className="bg-orange-100 dark:bg-orange-900/30 text-orange-600 px-2 py-0.5 rounded">فقط پرسنل</span>}</div></div>
+                                            <div className="flex gap-2"><button onClick={() => { setEditingQuestion(q); setShowQuestionModal(true); }} className="p-2 text-blue-500 hover:bg-blue-50 rounded-xl"><Edit2 className="w-5 h-5"/></button><button onClick={() => deleteQuestion(q.id, q.text)} className="p-2 text-red-500 hover:bg-red-50 rounded-xl"><Trash2 className="w-5 h-5"/></button></div>
+                                        </div>
+                                    ))}
+                                    {sortedQuestions.length === 0 && <div className="text-center py-10 text-slate-400">هیچ سوالی تعریف نشده است</div>}
+                                </div>
+                            </div>
+                        )}
 
                         {activeTab === 'general' && (
                              <div className="glass-panel p-6 rounded-3xl animate-fade-in space-y-8">
-                                 {/* Settings content same as before */}
-                                 <div>
-                                    <label className="block mb-3 font-bold text-slate-700 dark:text-white text-lg">نام برند و سامانه</label>
-                                    <input 
-                                        className="w-full p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xl font-bold dark:text-white outline-none focus:border-blue-500 transition-colors shadow-sm"
-                                        value={settings.brandName}
-                                        onChange={e => handleSave({...settings, brandName: e.target.value})}
-                                    />
-                                 </div>
-                                 
-                                 <div>
-                                    <label className="block mb-3 font-bold text-slate-700 dark:text-white text-lg flex items-center gap-2"><Key className="w-5 h-5"/> رمز عبور پنل توسعه‌دهنده</label>
-                                    <input 
-                                        className="w-full p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xl font-bold dark:text-white outline-none focus:border-blue-500 transition-colors shadow-sm tracking-widest text-center"
-                                        value={settings.developerPassword || ''}
-                                        onChange={e => handleSave({...settings, developerPassword: e.target.value})}
-                                        placeholder="رمز عبور..."
-                                    />
-                                 </div>
-
+                                 <div><label className="block mb-3 font-bold text-slate-700 dark:text-white text-lg">نام برند و سامانه</label><input className="w-full p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xl font-bold dark:text-white outline-none focus:border-blue-500 transition-colors shadow-sm" value={settings.brandName} onChange={e => handleSave({...settings, brandName: e.target.value})} /></div>
+                                 <div><label className="block mb-3 font-bold text-slate-700 dark:text-white text-lg flex items-center gap-2"><Key className="w-5 h-5"/> رمز عبور پنل توسعه‌دهنده</label><input className="w-full p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xl font-bold dark:text-white outline-none focus:border-blue-500 transition-colors shadow-sm tracking-widest text-center" value={settings.developerPassword || ''} onChange={e => handleSave({...settings, developerPassword: e.target.value})} placeholder="رمز عبور..." /></div>
                                  <div className="glass-card p-6 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700">
                                      <label className="block mb-4 font-bold text-slate-700 dark:text-white text-lg flex items-center gap-2"><Mic className="w-5 h-5 text-purple-500"/> تنظیمات تبدیل صدا به متن</label>
-                                     
-                                     <div className="grid grid-cols-2 md:grid-cols-6 gap-2 mb-6 bg-slate-200 dark:bg-slate-800 p-1.5 rounded-2xl">
-                                         <button 
-                                             onClick={() => handleSave({...settings, transcriptionMode: 'openai'})}
-                                             className={`py-3 rounded-xl font-bold transition-all text-xs md:text-sm flex items-center justify-center gap-1 ${settings.transcriptionMode === 'openai' ? 'bg-white dark:bg-purple-600 shadow text-purple-700 dark:text-white' : 'text-slate-500'}`}
-                                         >
-                                             <Brain className="w-4 h-4"/>
-                                             OpenAI
-                                         </button>
-                                         <button 
-                                             onClick={() => handleSave({...settings, transcriptionMode: 'iotype'})}
-                                             className={`py-3 rounded-xl font-bold transition-all text-xs md:text-sm flex items-center justify-center gap-1 ${settings.transcriptionMode === 'iotype' ? 'bg-white dark:bg-purple-600 shadow text-purple-700 dark:text-white' : 'text-slate-500'}`}
-                                         >
-                                             <Languages className="w-4 h-4"/>
-                                             IOType
-                                         </button>
-                                         <button 
-                                             onClick={() => handleSave({...settings, transcriptionMode: 'talkbot'})}
-                                             className={`py-3 rounded-xl font-bold transition-all text-xs md:text-sm flex items-center justify-center gap-1 ${settings.transcriptionMode === 'talkbot' ? 'bg-white dark:bg-purple-600 shadow text-purple-700 dark:text-white' : 'text-slate-500'}`}
-                                         >
-                                             <Bot className="w-4 h-4"/>
-                                             TalkBot
-                                         </button>
-                                         <button 
-                                             onClick={() => handleSave({...settings, transcriptionMode: 'groq'})}
-                                             className={`py-3 rounded-xl font-bold transition-all text-xs md:text-sm flex items-center justify-center gap-1 ${settings.transcriptionMode === 'groq' ? 'bg-white dark:bg-purple-600 shadow text-purple-700 dark:text-white' : 'text-slate-500'}`}
-                                         >
-                                             <Zap className="w-4 h-4"/>
-                                             Groq (High Speed)
-                                         </button>
-                                          <button 
-                                             onClick={() => handleSave({...settings, transcriptionMode: 'gemini'})}
-                                             className={`py-3 rounded-xl font-bold transition-all text-xs md:text-sm flex items-center justify-center gap-1 ${settings.transcriptionMode === 'gemini' ? 'bg-white dark:bg-purple-600 shadow text-purple-700 dark:text-white' : 'text-slate-500'}`}
-                                         >
-                                             <Sparkles className="w-4 h-4"/>
-                                             Gemini (Free)
-                                         </button>
-                                         <button 
-                                             onClick={() => handleSave({...settings, transcriptionMode: 'browser'})}
-                                             className={`py-3 rounded-xl font-bold transition-all text-xs md:text-sm flex items-center justify-center gap-1 ${settings.transcriptionMode === 'browser' ? 'bg-white dark:bg-purple-600 shadow text-purple-700 dark:text-white' : 'text-slate-500'}`}
-                                         >
-                                             <Globe className="w-4 h-4"/>
-                                             Browser
-                                         </button>
+                                     <div className="grid grid-cols-3 gap-2 mb-6 bg-slate-200 dark:bg-slate-800 p-1.5 rounded-2xl">
+                                         {['iotype','gemini','browser'].map(mode => (
+                                             <button key={mode} onClick={() => handleSave({...settings, transcriptionMode: mode as any})} className={`py-3 rounded-xl font-bold transition-all text-xs md:text-sm flex items-center justify-center gap-1 ${settings.transcriptionMode === mode ? 'bg-white dark:bg-purple-600 shadow text-purple-700 dark:text-white' : 'text-slate-500'}`}>{mode.toUpperCase()}</button>
+                                         ))}
                                      </div>
-
                                      <div className="space-y-4">
-                                         {/* API Keys inputs - same as before */}
-                                         <div>
-                                            <label className="block mb-2 font-bold text-slate-700 dark:text-slate-300 text-sm flex items-center gap-2"><Brain className="w-4 h-4"/> کلید API اوپن‌ای‌آی (OpenAI)</label>
-                                            <div className="flex gap-2">
-                                                <input 
-                                                    className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm font-mono dark:text-white outline-none focus:border-blue-500 text-left dir-ltr"
-                                                    dir="ltr"
-                                                    value={settings.openaiApiKey || ''}
-                                                    onChange={e => setSettings({...settings, openaiApiKey: e.target.value})}
-                                                    onBlur={() => handleSave(settings)}
-                                                    placeholder="sk-..."
-                                                    type="password"
-                                                />
-                                                <button onClick={testOpenaiApi} disabled={testOpenaiStatus === 'loading'} className="px-4 rounded-xl font-bold text-white bg-teal-600 hover:bg-teal-700 min-w-[80px] flex items-center justify-center">
-                                                    {testOpenaiStatus === 'loading' ? '...' : <Check className="w-5 h-5"/>}
-                                                </button>
-                                            </div>
-                                         </div>
-                                         {/* Other API Keys (Same as before) */}
-                                         <div>
-                                            <label className="block mb-2 font-bold text-slate-700 dark:text-slate-300 text-sm flex items-center gap-2"><Languages className="w-4 h-4"/> کلید API سرویس IOType (نویسه‌نگار)</label>
-                                            <div className="flex gap-2">
-                                                <input 
-                                                    className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm font-mono dark:text-white outline-none focus:border-blue-500 text-left dir-ltr"
-                                                    dir="ltr"
-                                                    value={settings.iotypeApiKey || ''}
-                                                    onChange={e => setSettings({...settings, iotypeApiKey: e.target.value})}
-                                                    onBlur={() => handleSave(settings)}
-                                                    placeholder="API Key..."
-                                                    type="password"
-                                                />
-                                                <button onClick={testIOTypeApi} disabled={testIOTypeStatus === 'loading'} className="px-4 rounded-xl font-bold text-white bg-teal-600 hover:bg-teal-700 min-w-[80px] flex items-center justify-center">
-                                                    {testIOTypeStatus === 'loading' ? '...' : <Check className="w-5 h-5"/>}
-                                                </button>
-                                            </div>
-                                         </div>
-
-                                         <div>
-                                            <label className="block mb-2 font-bold text-slate-700 dark:text-slate-300 text-sm flex items-center gap-2"><Bot className="w-4 h-4"/> کلید API سرویس TalkBot (تاک‌بات)</label>
-                                            <div className="flex gap-2">
-                                                <input 
-                                                    className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm font-mono dark:text-white outline-none focus:border-blue-500 text-left dir-ltr"
-                                                    dir="ltr"
-                                                    value={settings.talkbotApiKey || ''}
-                                                    onChange={e => setSettings({...settings, talkbotApiKey: e.target.value})}
-                                                    onBlur={() => handleSave(settings)}
-                                                    placeholder="API Key..."
-                                                    type="password"
-                                                />
-                                                <button onClick={testTalkBotApi} disabled={testTalkBotStatus === 'loading'} className="px-4 rounded-xl font-bold text-white bg-teal-600 hover:bg-teal-700 min-w-[80px] flex items-center justify-center">
-                                                    {testTalkBotStatus === 'loading' ? '...' : <Check className="w-5 h-5"/>}
-                                                </button>
-                                            </div>
-                                         </div>
+                                         <div><label className="block mb-2 font-bold text-slate-700 dark:text-slate-300 text-sm flex items-center gap-2"><Languages className="w-4 h-4"/> کلید API سرویس IOType</label><div className="flex gap-2"><input className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm font-mono dark:text-white outline-none focus:border-blue-500 text-left dir-ltr" dir="ltr" value={settings.iotypeApiKey || ''} onChange={e => setSettings({...settings, iotypeApiKey: e.target.value})} onBlur={() => handleSave(settings)} placeholder="API Key..." type="password"/><button onClick={testIOTypeApi} disabled={testIOTypeStatus === 'loading'} className="px-4 rounded-xl font-bold text-white bg-teal-600 hover:bg-teal-700 min-w-[80px] flex items-center justify-center">{testIOTypeStatus === 'loading' ? '...' : <Check className="w-5 h-5"/>}</button></div></div>
                                          
                                          <div>
-                                            <label className="block mb-2 font-bold text-slate-700 dark:text-slate-300 text-sm flex items-center gap-2"><Zap className="w-4 h-4"/> کلید API سرویس Groq (Whisper Large-v3)</label>
-                                            <div className="flex gap-2">
-                                                <input 
-                                                    className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm font-mono dark:text-white outline-none focus:border-blue-500 text-left dir-ltr"
-                                                    dir="ltr"
-                                                    value={settings.groqApiKey || ''}
-                                                    onChange={e => setSettings({...settings, groqApiKey: e.target.value})}
-                                                    onBlur={() => handleSave(settings)}
-                                                    placeholder="gsk_..."
-                                                    type="password"
-                                                />
-                                                 <button onClick={testGroqApi} disabled={testGroqStatus === 'loading'} className="px-4 rounded-xl font-bold text-white bg-teal-600 hover:bg-teal-700 min-w-[80px] flex items-center justify-center">
-                                                    {testGroqStatus === 'loading' ? '...' : <Check className="w-5 h-5"/>}
-                                                </button>
-                                            </div>
-                                         </div>
-
-                                          <div>
-                                            <label className="block mb-2 font-bold text-slate-700 dark:text-slate-300 text-sm flex items-center gap-2"><Sparkles className="w-4 h-4"/> کلید API سرویس Google Gemini (Flash)</label>
-                                            <div className="flex gap-2">
-                                                <input 
-                                                    className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm font-mono dark:text-white outline-none focus:border-blue-500 text-left dir-ltr"
-                                                    dir="ltr"
-                                                    value={settings.geminiApiKey || ''}
-                                                    onChange={e => setSettings({...settings, geminiApiKey: e.target.value})}
-                                                    onBlur={() => handleSave(settings)}
-                                                    placeholder="AIza..."
-                                                    type="password"
-                                                />
-                                                <button onClick={testGeminiApi} disabled={testGeminiStatus === 'loading'} className="px-4 rounded-xl font-bold text-white bg-teal-600 hover:bg-teal-700 min-w-[80px] flex items-center justify-center">
-                                                    {testGeminiStatus === 'loading' ? '...' : <Check className="w-5 h-5"/>}
-                                                </button>
-                                            </div>
+                                             <div className="flex justify-between items-center mb-2">
+                                                 <label className="font-bold text-slate-700 dark:text-slate-300 text-sm flex items-center gap-2"><Sparkles className="w-4 h-4"/> کلیدهای API سرویس Gemini</label>
+                                                 <button onClick={addGeminiKey} className="text-emerald-600 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900/30 p-1 rounded-lg hover:scale-110 transition-transform"><Plus className="w-4 h-4"/></button>
+                                             </div>
+                                             <div className="space-y-2">
+                                                 {(settings.geminiApiKeys || []).map((key, idx) => (
+                                                     <div key={idx} className="flex gap-2">
+                                                         <input 
+                                                            className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm font-mono dark:text-white outline-none focus:border-blue-500 text-left dir-ltr" 
+                                                            dir="ltr" 
+                                                            value={key} 
+                                                            onChange={e => updateGeminiKey(idx, e.target.value)}
+                                                            onBlur={() => handleSave(settings)}
+                                                            placeholder={`کلید ${idx + 1}`} 
+                                                            type="password"
+                                                         />
+                                                         <button onClick={() => removeGeminiKey(idx)} className="text-red-500 bg-red-100 dark:bg-red-900/30 p-3 rounded-xl hover:bg-red-200 dark:hover:bg-red-800 transition-colors"><Trash2 className="w-5 h-5"/></button>
+                                                     </div>
+                                                 ))}
+                                                 {(settings.geminiApiKeys || []).length > 0 && (
+                                                     <div className="flex justify-end mt-2">
+                                                         <button onClick={testGeminiApi} disabled={testGeminiStatus === 'loading'} className="px-4 py-2 rounded-xl font-bold text-white bg-teal-600 hover:bg-teal-700 flex items-center gap-2 text-sm">{testGeminiStatus === 'loading' ? 'در حال تست...' : 'تست و ذخیره همه'}</button>
+                                                     </div>
+                                                 )}
+                                             </div>
+                                             <p className="text-xs text-slate-500 mt-2">سیستم به ترتیب از کلیدها استفاده می‌کند. اگر یکی خطا دهد، کلید بعدی امتحان می‌شود.</p>
                                          </div>
                                      </div>
                                  </div>
-
                                  <div className="border-t border-slate-200 dark:border-slate-700 pt-6">
-                                     <h3 className="text-xl font-black text-slate-800 dark:text-white mb-4 flex items-center gap-2">
-                                         <Palette className="w-5 h-5 text-purple-500"/>
-                                         آیکون‌های پس‌زمینه
-                                     </h3>
+                                     <h3 className="text-xl font-black text-slate-800 dark:text-white mb-4 flex items-center gap-2"><Palette className="w-5 h-5 text-purple-500"/> آیکون‌های پس‌زمینه</h3>
                                      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                                         {AVAILABLE_ICONS.map(icon => (
-                                             <button 
-                                                key={icon}
-                                                onClick={() => toggleIcon(icon)}
-                                                className={`p-4 rounded-xl border-2 transition-all flex flex-col items-center gap-2 ${settings.enabledIcons?.includes(icon) ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300' : 'border-slate-200 dark:border-slate-700 text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
-                                             >
-                                                {settings.enabledIcons?.includes(icon) ? <CheckSquare className="w-5 h-5"/> : <Square className="w-5 h-5"/>}
-                                                <span className="text-xs font-bold">{icon}</span>
-                                             </button>
-                                         ))}
+                                         {AVAILABLE_ICONS.map(icon => (<button key={icon} onClick={() => toggleIcon(icon)} className={`p-4 rounded-xl border-2 transition-all flex flex-col items-center gap-2 ${settings.enabledIcons?.includes(icon) ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300' : 'border-slate-200 dark:border-slate-700 text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>{settings.enabledIcons?.includes(icon) ? <CheckSquare className="w-5 h-5"/> : <Square className="w-5 h-5"/>}<span className="text-xs font-bold">{icon}</span></button>))}
                                      </div>
                                  </div>
                              </div>
@@ -673,37 +475,20 @@ const DeveloperPanel: React.FC = () => {
                         {activeTab === 'backup' && (
                             <div className="glass-panel p-6 rounded-3xl animate-fade-in flex flex-col gap-6">
                                 <h2 className="text-2xl font-black mb-4 dark:text-white">پشتیبان‌گیری و بازیابی</h2>
-                                
                                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                    {/* Data Only Backup */}
                                     <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700">
                                         <h3 className="font-bold text-lg mb-3 flex items-center gap-2"><FileText className="w-5 h-5 text-blue-500"/> بکاپ داده‌ها (اکسل)</h3>
                                         <div className="flex flex-col gap-3">
                                             <button onClick={doBackup} className="bg-blue-600 text-white p-4 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-blue-700 text-sm"><Download className="w-4 h-4"/> دانلود فایل اکسل (فقط فرم‌ها)</button>
-                                            <div className="relative border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-xl p-4 text-center hover:bg-white dark:hover:bg-slate-800 transition-colors cursor-pointer">
-                                                <input type="file" onChange={doRestore} className="absolute inset-0 opacity-0 cursor-pointer" accept=".xlsx" />
-                                                <p className="font-bold text-xs text-slate-500 dark:text-slate-400">بازیابی از فایل اکسل</p>
-                                            </div>
+                                            <div className="relative border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-xl p-4 text-center hover:bg-white dark:hover:bg-slate-800 transition-colors cursor-pointer"><input type="file" onChange={doRestore} className="absolute inset-0 opacity-0 cursor-pointer" accept=".xlsx" /><p className="font-bold text-xs text-slate-500 dark:text-slate-400">بازیابی از فایل اکسل</p></div>
                                         </div>
                                     </div>
-
-                                    {/* Full System Backup */}
                                     <div className="p-4 bg-emerald-50 dark:bg-emerald-900/10 rounded-2xl border border-emerald-200 dark:border-emerald-800/50">
                                         <h3 className="font-bold text-lg mb-3 flex items-center gap-2 text-emerald-800 dark:text-emerald-200"><HardDrive className="w-5 h-5"/> بکاپ کامل سیستم</h3>
                                         <p className="text-xs text-emerald-700 dark:text-emerald-400 mb-3 leading-relaxed">شامل: تنظیمات، کاربران، فرم‌ها و <b>تمام فایل‌های صوتی</b> ضبط شده.</p>
                                         <div className="flex flex-col gap-3">
-                                            <button 
-                                                onClick={handleFullBackup} 
-                                                className="bg-emerald-600 text-white p-4 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-emerald-700 text-sm disabled:opacity-70 disabled:cursor-wait"
-                                            >
-                                                <Download className="w-4 h-4"/> دانلود بکاپ کامل (JSON)
-                                            </button>
-                                            <div className="relative border-2 border-dashed border-emerald-300 dark:border-emerald-700 rounded-xl p-4 text-center hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-colors cursor-pointer">
-                                                <input type="file" onChange={handleFullRestore} disabled={isRestoring} className="absolute inset-0 opacity-0 cursor-pointer" accept=".json" />
-                                                <p className="font-bold text-xs text-emerald-700 dark:text-emerald-400">
-                                                    {isRestoring ? 'در حال بازگردانی...' : 'بازیابی فایل JSON کامل'}
-                                                </p>
-                                            </div>
+                                            <button onClick={handleFullBackup} className="bg-emerald-600 text-white p-4 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-emerald-700 text-sm disabled:opacity-70 disabled:cursor-wait"><Download className="w-4 h-4"/> دانلود بکاپ کامل (JSON)</button>
+                                            <div className="relative border-2 border-dashed border-emerald-300 dark:border-emerald-700 rounded-xl p-4 text-center hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-colors cursor-pointer"><input type="file" onChange={handleFullRestore} disabled={isRestoring} className="absolute inset-0 opacity-0 cursor-pointer" accept=".json" /><p className="font-bold text-xs text-emerald-700 dark:text-emerald-400">{isRestoring ? 'در حال بازگردانی...' : 'بازیابی فایل JSON کامل'}</p></div>
                                         </div>
                                     </div>
                                 </div>
@@ -727,15 +512,17 @@ const DeveloperPanel: React.FC = () => {
                 </div>
             </div>
 
+            {/* User Edit Modal & Question Modal remain same */}
             {showUserModal && editingUser && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
                     <div className="glass-panel w-full max-w-md p-6 rounded-3xl bg-white dark:bg-slate-900">
-                        {/* User Modal Content (Same as before) */}
                         <h3 className="text-xl font-black mb-6 dark:text-white">{editingUser.id ? 'ویرایش کاربر' : 'کاربر جدید'}</h3>
                         <div className="space-y-4">
                             <div><label className="block text-sm font-bold text-slate-500 mb-1">نام کامل</label><input className="w-full p-3 rounded-xl bg-slate-100 dark:bg-slate-800 outline-none" value={editingUser.name || ''} onChange={e=>setEditingUser({...editingUser, name:e.target.value})}/></div>
                             <div><label className="block text-sm font-bold text-slate-500 mb-1">نام کاربری (انگلیسی)</label><input className="w-full p-3 rounded-xl bg-slate-100 dark:bg-slate-800 outline-none font-mono text-left" dir="ltr" value={editingUser.username || ''} onChange={e=>setEditingUser({...editingUser, username:e.target.value})}/></div>
-                            <div><label className="block text-sm font-bold text-slate-500 mb-1">نقش</label>
+                            <div><label className="block text-sm font-bold text-slate-500 mb-1">عنوان شغلی (سمت)</label><input className="w-full p-3 rounded-xl bg-slate-100 dark:bg-slate-800 outline-none" value={editingUser.title || ''} onChange={e=>setEditingUser({...editingUser, title:e.target.value})} placeholder="مثال: مسئول مالی، سوپروایزر..." /></div>
+                            <div><label className="block text-sm font-bold text-slate-500 mb-1">اولویت نمایش (عدد)</label><input type="number" className="w-full p-3 rounded-xl bg-slate-100 dark:bg-slate-800 outline-none font-mono text-center" value={editingUser.order || 99} onChange={e=>setEditingUser({...editingUser, order:parseInt(e.target.value) || 99})} /></div>
+                            <div><label className="block text-sm font-bold text-slate-500 mb-1">سطح دسترسی</label>
                                 <select className="w-full p-3 rounded-xl bg-slate-100 dark:bg-slate-800 outline-none" value={editingUser.role} onChange={e=>setEditingUser({...editingUser, role:e.target.value as any})}>
                                     <option value="staff">پرسنل (دسترسی محدود)</option>
                                     <option value="admin">مدیر (دسترسی کامل)</option>
@@ -763,10 +550,9 @@ const DeveloperPanel: React.FC = () => {
                     </div>
                 </div>
             )}
-
+            
             {showQuestionModal && editingQuestion && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
-                   {/* Question Modal Content (Same as before) */}
                    <div className="glass-panel w-full max-w-lg p-6 rounded-3xl bg-white dark:bg-slate-900">
                         <h3 className="text-xl font-black mb-6 dark:text-white">{editingQuestion.id ? 'ویرایش سوال' : 'سوال جدید'}</h3>
                         <div className="space-y-4">
@@ -802,7 +588,6 @@ const DeveloperPanel: React.FC = () => {
                     </div>
                 </div>
             )}
-
         </div>
     );
 };

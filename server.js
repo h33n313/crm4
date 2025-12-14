@@ -8,19 +8,17 @@ const axios = require('axios');
 const FormData = require('form-data');
 const fs = require('fs');
 const multer = require('multer');
-const Groq = require('groq-sdk');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/crm_db';
 
 app.use(cors());
-// INCREASED LIMIT FOR FULL BACKUPS
 app.use(express.json({ limit: '500mb' }));
 app.use(express.urlencoded({ limit: '500mb', extended: true }));
 app.use(express.static(path.join(__dirname, 'dist')));
 
-// --- Static Uploads Directory for TalkBot ---
+// --- Static Uploads Directory ---
 const uploadsDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadsDir)) {
     fs.mkdirSync(uploadsDir);
@@ -60,6 +58,8 @@ const UserSchema = new mongoose.Schema({
     username: String,
     name: String,
     role: String,
+    title: String,
+    order: { type: Number, default: 99 },
     isPasswordEnabled: Boolean,
     password: { type: String, default: '' },
     avatarColor: String
@@ -68,11 +68,8 @@ const UserSchema = new mongoose.Schema({
 const SettingsSchema = new mongoose.Schema({
     brandName: String,
     developerPassword: String,
-    openaiApiKey: String, 
     iotypeApiKey: String,
-    talkbotApiKey: String, 
-    groqApiKey: String, 
-    geminiApiKey: String, 
+    geminiApiKeys: [String], // Changed to Array of Strings
     transcriptionMode: { type: String, default: 'iotype' },
     users: [UserSchema],
     questions: [QuestionSchema],
@@ -124,23 +121,20 @@ const FeedbackSchema = new mongoose.Schema({
 
 const FeedbackModel = mongoose.model('Feedback', FeedbackSchema);
 
-// --- Defaults (UPDATED TO MATCH YOUR REQUEST) ---
+// --- Defaults ---
 const DEFAULT_SETTINGS = {
     brandName: "سامانه جهان امید سلامت",
     developerPassword: "111",
-    openaiApiKey: "",
     iotypeApiKey: "uGobvO0d2JVAXCB3TiRygJ2R4Zwy3gaH",
-    talkbotApiKey: "sk-2cf1f7dc54a0fd9e2b83227fde48de1f",
-    groqApiKey: "",
-    geminiApiKey: "",
-    transcriptionMode: "talkbot",
+    geminiApiKeys: [],
+    transcriptionMode: "iotype",
     users: [
-        { id: "admin1", username: "matlabi", name: "آقای مطلبی", role: "admin", isPasswordEnabled: false, password: "", avatarColor: "bg-blue-600" },
-        { id: "admin2", username: "kand", name: "آقای کاند", role: "admin", isPasswordEnabled: false, password: "", avatarColor: "bg-indigo-600" },
-        { id: "admin3", username: "mahlouji", name: "آقای مهلوجی", role: "admin", isPasswordEnabled: false, password: "", avatarColor: "bg-teal-600" }, 
-        { id: "staff1", username: "mostafavi", name: "آقای مصطفوی", role: "admin", isPasswordEnabled: false, password: "", avatarColor: "bg-cyan-600" },
-        { id: "staff2", username: "farid", name: "خانم فرید", role: "staff", isPasswordEnabled: false, password: "", avatarColor: "bg-pink-500" },
-        { id: "staff3", username: "sec", name: "منشی‌ها", role: "staff", isPasswordEnabled: false, password: "", avatarColor: "bg-purple-500" }
+        { id: "admin1", username: "matlabi", name: "آقای مطلبی", role: "admin", title: "مدیر اصلی", order: 1, isPasswordEnabled: false, password: "", avatarColor: "bg-blue-600" },
+        { id: "admin2", username: "kand", name: "آقای کاند", role: "admin", title: "مدیر اصلی", order: 2, isPasswordEnabled: false, password: "", avatarColor: "bg-indigo-600" },
+        { id: "admin3", username: "mahlouji", name: "آقای مهلوجی", role: "admin", title: "مسئول مالی", order: 3, isPasswordEnabled: false, password: "", avatarColor: "bg-teal-600" }, 
+        { id: "staff1", username: "mostafavi", name: "آقای مصطفوی", role: "admin", title: "سوپروایزر", order: 4, isPasswordEnabled: false, password: "", avatarColor: "bg-cyan-600" },
+        { id: "staff2", username: "farid", name: "خانم فرید", role: "staff", title: "پرسنل", order: 5, isPasswordEnabled: false, password: "", avatarColor: "bg-pink-500" },
+        { id: "staff3", username: "sec", name: "منشی‌ها", role: "staff", title: "منشی بخش", order: 6, isPasswordEnabled: false, password: "", avatarColor: "bg-purple-500" }
     ],
     questions: [
         { id: "q1", order: 1, type: "yes_no", text: "آیا آموزش‌های حین ترخیص به بیمار داده شده است؟", visibility: 'all', category: 'discharge' },
@@ -266,49 +260,70 @@ app.post('/api/users/password', async (req, res) => {
     }
 });
 
-// --- NEW STT ENDPOINT (GROQ & GEMINI) ---
+// --- NEW STT ENDPOINT (GEMINI MULTI-KEY) ---
 app.post('/api/stt', upload.single('audioFile'), async (req, res) => {
     const filePath = req.file?.path;
 
     try {
-        const { provider, apiKey } = req.body;
-        if (!req.file || !provider || !apiKey) {
+        const { provider, apiKeys } = req.body; // Expecting array of keys
+        if (!req.file || !provider || !apiKeys) {
             if (filePath) try { fs.unlinkSync(filePath); } catch (e) {}
-            return res.status(400).json({ error: 'Missing audio file, provider, or API key.' });
+            return res.status(400).json({ error: 'Missing audio file, provider, or API keys.' });
         }
 
         let transcription = '';
 
-        if (provider === 'groq') {
-            const groq = new Groq({ apiKey: apiKey });
-            const transcriptionResponse = await groq.audio.transcriptions.create({
-                file: fs.createReadStream(filePath),
-                model: 'whisper-large-v3',
-                language: 'fa',
-                prompt: 'این یک صدای ضبط شده فارسی است لطفا آن را دقیق به متن فارسی تبدیل کن',
-                response_format: 'json'
-            });
-            transcription = transcriptionResponse.text;
-
-        } else if (provider === 'gemini') {
+        if (provider === 'gemini') {
             const { GoogleGenAI } = await import("@google/genai");
-            const ai = new GoogleGenAI({ apiKey: apiKey });
+            
+            // Handle Multiple Keys from Array
+            let keys = [];
+            try {
+                keys = typeof apiKeys === 'string' ? JSON.parse(apiKeys) : apiKeys;
+                if (!Array.isArray(keys)) keys = [apiKeys];
+            } catch(e) {
+                keys = [apiKeys];
+            }
+            
+            let lastError = null;
+            let success = false;
+
             const fileBuffer = fs.readFileSync(filePath);
             const base64Audio = fileBuffer.toString('base64');
             const mimeType = req.file.mimetype || 'audio/webm';
 
-            const response = await ai.models.generateContent({
-                model: 'gemini-2.5-flash',
-                contents: [
-                    {
-                        parts: [
-                            { inlineData: { mimeType: mimeType, data: base64Audio } },
-                            { text: "Transcribe this audio exactly to Persian text. Do not translate. Just transcribe." }
+            for (const key of keys) {
+                if(!key || key.trim() === '') continue;
+                try {
+                    const ai = new GoogleGenAI({ apiKey: key });
+                    const response = await ai.models.generateContent({
+                        model: 'gemini-2.5-flash',
+                        contents: [
+                            {
+                                parts: [
+                                    { inlineData: { mimeType: mimeType, data: base64Audio } },
+                                    { text: "Transcribe this audio exactly to Persian text. Do not translate. Just transcribe." }
+                                ]
+                            }
                         ]
+                    });
+                    
+                    if (response.text) {
+                        transcription = response.text;
+                        success = true;
+                        break; // Stop loop on success
                     }
-                ]
-            });
-            transcription = response.text || "";
+                } catch (err) {
+                    console.error(`Gemini Key Failed (${key.substring(0,6)}...):`, err.message);
+                    lastError = err;
+                    // Continue to next key
+                }
+            }
+
+            if (!success) {
+                throw new Error("All Gemini API keys failed. Last error: " + (lastError?.message || "Unknown"));
+            }
+
         } else {
             throw new Error('Invalid provider specified.');
         }
@@ -323,41 +338,35 @@ app.post('/api/stt', upload.single('audioFile'), async (req, res) => {
     }
 });
 
-// Test Endpoints (OpenAI, Groq, Gemini, IOType, TalkBot) - Kept same as previous
-app.post('/api/test-openai', async (req, res) => {
-    try {
-        const settings = await SettingsModel.findOne();
-        const apiKey = settings?.openaiApiKey;
-        if (!apiKey) return res.status(400).json({ error: 'کلید API OpenAI تنظیم نشده است' });
-        const response = await axios.post('https://api.openai.com/v1/chat/completions', {
-            model: "gpt-3.5-turbo",
-            messages: [{ role: "user", content: "Ping" }],
-            max_tokens: 1
-        }, { headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' } });
-        res.json({ message: 'Success', details: 'Connection OK' });
-    } catch (e) { res.status(500).json({ error: e.response?.data?.error?.message || e.message }); }
-});
-
-app.post('/api/test-groq', async (req, res) => {
-    try {
-        const settings = await SettingsModel.findOne();
-        const apiKey = settings?.groqApiKey;
-        if (!apiKey) return res.status(400).json({ error: 'Groq API Key not configured' });
-        const groq = new Groq({ apiKey: apiKey });
-        const chatCompletion = await groq.chat.completions.create({ messages: [{ role: 'user', content: 'Ping' }], model: 'llama3-8b-8192' });
-        res.json({ message: 'Success', details: chatCompletion.choices[0]?.message?.content });
-    } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
+// Test Endpoints
 app.post('/api/test-gemini', async (req, res) => {
     try {
         const settings = await SettingsModel.findOne();
-        const apiKey = settings?.geminiApiKey;
-        if (!apiKey) return res.status(400).json({ error: 'Gemini API Key not configured' });
+        const keys = settings?.geminiApiKeys || [];
+        if (!keys || keys.length === 0) return res.status(400).json({ error: 'Gemini API Keys not configured' });
+        
         const { GoogleGenAI } = await import("@google/genai");
-        const ai = new GoogleGenAI({ apiKey: apiKey });
-        const response = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: 'Ping' });
-        res.json({ message: 'Success', details: response.text });
+        let success = false;
+        let details = "";
+
+        for (const key of keys) {
+            if(!key || key.trim() === '') continue;
+            try {
+                const ai = new GoogleGenAI({ apiKey: key });
+                const response = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: 'Ping' });
+                details = response.text;
+                success = true;
+                break;
+            } catch (err) {
+                console.error(`Gemini Test Key Failed (${key.substring(0,6)}...):`, err.message);
+            }
+        }
+
+        if (success) {
+            res.json({ message: 'Success', details: details });
+        } else {
+            res.status(500).json({ error: "All Gemini keys failed." });
+        }
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -374,65 +383,6 @@ app.post('/api/test-iotype', async (req, res) => {
         const response = await axios.post('https://www.iotype.com/developer/transcription', form, { headers: { ...form.getHeaders(), 'Authorization': apiKey, 'X-Requested-With': 'XMLHttpRequest' } });
         if (response.data.status === 0) return res.status(400).json({ error: response.data.message });
         res.json({ message: 'Success', details: 'Connection OK' });
-    } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-app.post('/api/test-talkbot', async (req, res) => {
-    try {
-        const settings = await SettingsModel.findOne();
-        const apiKey = settings?.talkbotApiKey;
-        if (!apiKey) return res.status(400).json({ error: 'TalkBot API Key not configured' });
-        const base64Audio = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEAQB8AAEAfAAABAAgAAABkYXRhAAAAAA==";
-        const { data: buffer, ext } = processBase64Audio(base64Audio);
-        const filename = `test_talkbot_${Date.now()}.${ext}`;
-        const filePath = path.join(uploadsDir, filename);
-        fs.writeFileSync(filePath, buffer);
-        const protocol = req.protocol;
-        const host = req.get('host');
-        const fileUrl = `${protocol}://${host}/uploads/${filename}`;
-        const response = await axios.post('https://api.talkbot.ir/v1/media/speech-to-text/REQ', { url: fileUrl, language: 'none' }, { headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' } });
-        try { fs.unlinkSync(filePath); } catch (e) {}
-        if (response.data && response.data.response && response.data.response.code === 200) res.json({ message: 'Success', details: 'Connection OK' });
-        else return res.status(400).json({ error: response.data.response?.message || 'TalkBot API Error' });
-    } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-// Transcription Endpoints
-app.post('/api/transcribe-talkbot', async (req, res) => {
-    try {
-        const { audio } = req.body;
-        if (!audio) return res.status(400).json({ error: 'No audio data received' });
-        const settings = await SettingsModel.findOne();
-        const apiKey = settings?.talkbotApiKey;
-        if (!apiKey) return res.status(400).json({ error: 'TalkBot API Key not configured' });
-        const { data: buffer, ext } = processBase64Audio(audio);
-        const filename = `talkbot_${Date.now()}_${Math.floor(Math.random()*1000)}.${ext}`;
-        const filePath = path.join(uploadsDir, filename);
-        fs.writeFileSync(filePath, buffer);
-        const protocol = req.protocol;
-        const host = req.get('host');
-        const fileUrl = `${protocol}://${host}/uploads/${filename}`;
-        const response = await axios.post('https://api.talkbot.ir/v1/media/speech-to-text/REQ', { url: fileUrl, language: 'fa' }, { headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' } });
-        try { fs.unlinkSync(filePath); } catch (e) {}
-        if (response.data && response.data.response && response.data.response.code === 200) res.json({ text: response.data.response.output || '' });
-        else res.status(500).json({ error: response.data.response?.message || 'TalkBot API Error' });
-    } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-app.post('/api/transcribe-openai', async (req, res) => {
-    try {
-        const { audio } = req.body;
-        if (!audio) return res.status(400).json({ error: 'No audio data' });
-        const settings = await SettingsModel.findOne();
-        const apiKey = settings?.openaiApiKey;
-        if (!apiKey) return res.status(400).json({ error: 'OpenAI API Key not configured' });
-        const { data: buffer, type, ext } = processBase64Audio(audio);
-        const form = new FormData();
-        form.append('file', buffer, { filename: `recording.${ext}`, contentType: type });
-        form.append('model', 'whisper-1');
-        form.append('language', 'fa');
-        const response = await axios.post('https://api.openai.com/v1/audio/transcriptions', form, { headers: { ...form.getHeaders(), 'Authorization': `Bearer ${apiKey}` } });
-        res.json({ text: response.data.text || '' });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -484,7 +434,7 @@ app.delete('/api/feedback/:id', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// Full System Backup - UPDATED for Stream Download
+// Full System Backup
 app.get('/api/full-backup', async (req, res) => {
     try {
         const settings = await SettingsModel.findOne();
@@ -498,11 +448,8 @@ app.get('/api/full-backup', async (req, res) => {
 
         const fileName = `Full_Backup_${new Date().toISOString().slice(0, 10)}.json`;
         
-        // Set headers for file download
         res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
         res.setHeader('Content-Type', 'application/json');
-
-        // Send JSON string directly to stream it
         res.send(JSON.stringify(backupData, null, 2));
 
     } catch (e) {

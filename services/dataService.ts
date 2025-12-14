@@ -13,19 +13,16 @@ const LS_KEYS = { SETTINGS: 'crm_settings', DATA: 'crm_feedback_data', LOGS: 'cr
 const CLIENT_DEFAULTS: Settings = {
     brandName: "سامانه جهان امید سلامت",
     developerPassword: "111",
-    openaiApiKey: "", 
     iotypeApiKey: "uGobvO0d2JVAXCB3TiRygJ2R4Zwy3gaH",
-    talkbotApiKey: "sk-2cf1f7dc54a0fd9e2b83227fde48de1f", 
-    groqApiKey: "", // New Default
-    geminiApiKey: "", // New Default
-    transcriptionMode: "talkbot", 
+    geminiApiKeys: [], 
+    transcriptionMode: "iotype", 
     users: [
-        { id: "admin1", username: "matlabi", name: "آقای مطلبی", role: "admin", isPasswordEnabled: false, password: "", avatarColor: "bg-blue-600" },
-        { id: "admin2", username: "kand", name: "آقای کاند", role: "admin", isPasswordEnabled: false, password: "", avatarColor: "bg-indigo-600" },
-        { id: "admin3", username: "mahlouji", name: "آقای مهلوجی", role: "admin", isPasswordEnabled: false, password: "", avatarColor: "bg-teal-600" }, // Added Mahlouji
-        { id: "staff1", username: "mostafavi", name: "آقای مصطفوی", role: "admin", isPasswordEnabled: false, password: "", avatarColor: "bg-cyan-600" },
-        { id: "staff2", username: "farid", name: "خانم فرید", role: "staff", isPasswordEnabled: false, password: "", avatarColor: "bg-pink-500" },
-        { id: "staff3", username: "sec", name: "منشی‌ها", role: "staff", isPasswordEnabled: false, password: "", avatarColor: "bg-purple-500" }
+        { id: "admin1", username: "matlabi", name: "آقای مطلبی", role: "admin", title: "مدیر اصلی", order: 1, isPasswordEnabled: false, password: "", avatarColor: "bg-blue-600" },
+        { id: "admin2", username: "kand", name: "آقای کاند", role: "admin", title: "مدیر اصلی", order: 2, isPasswordEnabled: false, password: "", avatarColor: "bg-indigo-600" },
+        { id: "admin3", username: "mahlouji", name: "آقای مهلوجی", role: "admin", title: "مسئول مالی", order: 3, isPasswordEnabled: false, password: "", avatarColor: "bg-teal-600" }, 
+        { id: "staff1", username: "mostafavi", name: "آقای مصطفوی", role: "admin", title: "سوپروایزر", order: 4, isPasswordEnabled: false, password: "", avatarColor: "bg-cyan-600" },
+        { id: "staff2", username: "farid", name: "خانم فرید", role: "staff", title: "پرسنل", order: 5, isPasswordEnabled: false, password: "", avatarColor: "bg-pink-500" },
+        { id: "staff3", username: "sec", name: "منشی‌ها", role: "staff", title: "منشی بخش", order: 6, isPasswordEnabled: false, password: "", avatarColor: "bg-purple-500" }
     ],
     questions: [
         { id: "q1", order: 1, type: "yes_no", text: "آیا آموزش‌های حین ترخیص به بیمار داده شده است؟", visibility: 'all', category: 'discharge' },
@@ -206,7 +203,6 @@ export const restoreData = async (data: any[]) => {
     }
 };
 
-// --- NEW FULL BACKUP SERVICES ---
 export const performFullBackup = async () => {
     const res = await fetch('/api/full-backup');
     if (!res.ok) throw new Error('Backup failed');

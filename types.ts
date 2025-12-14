@@ -60,7 +60,7 @@ export interface Feedback {
   dischargeInfo: DischargeInfo;
   ward: string;
   answers: Record<string, any>;
-  audioFiles?: Record<string, string | string[]>; // Changed to support multiple files
+  audioFiles?: Record<string, string | string[]>; 
   createdAt: string;
   lastModified: string;
 }
@@ -70,6 +70,8 @@ export interface AppUser {
   username: string;
   name: string;
   role: Role;
+  title?: string;
+  order?: number;
   password?: string;
   isPasswordEnabled: boolean;
   avatarColor?: string;
@@ -78,12 +80,9 @@ export interface AppUser {
 export interface Settings {
   brandName: string;
   developerPassword?: string;
-  openaiApiKey?: string; 
   iotypeApiKey?: string;
-  talkbotApiKey?: string; 
-  groqApiKey?: string; // Added Groq
-  geminiApiKey?: string; // Added Gemini
-  transcriptionMode?: 'openai' | 'iotype' | 'talkbot' | 'browser' | 'groq' | 'gemini'; // Added modes
+  geminiApiKeys?: string[]; // Changed to array
+  transcriptionMode?: 'iotype' | 'browser' | 'gemini';
   users: AppUser[];
   questions: SurveyQuestion[]; 
   enabledIcons?: string[]; 

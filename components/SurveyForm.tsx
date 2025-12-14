@@ -20,7 +20,7 @@ interface VoiceInputProps {
     onAudioData: (base64Audios: string[]) => void;
     label?: string;
     hasError?: boolean;
-    transcriptionMode?: 'openai' | 'iotype' | 'talkbot' | 'browser' | 'groq' | 'gemini';
+    transcriptionMode?: 'iotype' | 'browser' | 'gemini';
     existingAudio?: string | string[];
     isPublicView: boolean;
 }
@@ -114,21 +114,22 @@ const VoiceRecorderInput: React.FC<VoiceInputProps> = ({ value, onChange, placeh
                     onAudioData(newRecordings);
 
                     // Server-side Processing
-                    if (transcriptionMode === 'openai' || transcriptionMode === 'iotype' || transcriptionMode === 'talkbot' || transcriptionMode === 'groq' || transcriptionMode === 'gemini') {
+                    if (transcriptionMode === 'iotype' || transcriptionMode === 'gemini') {
                         setIsProcessing(true);
                         try {
                             // Unified STT handling
-                            if (transcriptionMode === 'groq' || transcriptionMode === 'gemini') {
-                                // For Groq/Gemini, we upload the file via formData to the new endpoint
+                            if (transcriptionMode === 'gemini') {
+                                // For Gemini, we upload the file via formData to the new endpoint
                                 const settings = await getSettings();
-                                const apiKey = transcriptionMode === 'groq' ? settings.groqApiKey : settings.geminiApiKey;
+                                const apiKeys = settings.geminiApiKeys || [];
                                 
-                                if (!apiKey) throw new Error(`${transcriptionMode} API key is missing.`);
+                                if (apiKeys.length === 0) throw new Error(`${transcriptionMode} API keys are missing.`);
 
                                 const formData = new FormData();
                                 formData.append('audioFile', audioBlob, 'audio.webm'); // Ensure filename extension matches mimetype roughly
                                 formData.append('provider', transcriptionMode);
-                                formData.append('apiKey', apiKey);
+                                // Pass array as JSON string or handle on server if FormData supports array
+                                formData.append('apiKeys', JSON.stringify(apiKeys)); 
 
                                 const res = await fetch('/api/stt', {
                                     method: 'POST',
@@ -143,12 +144,8 @@ const VoiceRecorderInput: React.FC<VoiceInputProps> = ({ value, onChange, placeh
                                     onChange(finalText);
                                 }
                             } else {
-                                // Legacy handlers
-                                let endpoint = '/api/transcribe-iotype'; // Default fallback
-                                if (transcriptionMode === 'openai') endpoint = '/api/transcribe-openai';
-                                if (transcriptionMode === 'talkbot') endpoint = '/api/transcribe-talkbot';
-
-                                const res = await fetch(endpoint, {
+                                // IOType handler (default fallback)
+                                const res = await fetch('/api/transcribe-iotype', {
                                     method: 'POST',
                                     headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify({ audio: base64Audio })
@@ -307,12 +304,25 @@ const Input = ({ label, value, onChange, placeholder, hasError, className }: any
 
 const ValidationInput = ({ label, value, onChange, placeholder, hasError, expectedLength, isMobile, onBlur }: any) => {
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const val = e.target.value;
+        const val = e.target.value.replace(/[^0-9]/g, ''); // Enforce numbers only
         if (expectedLength && val.length > expectedLength) return;
         onChange(val);
     }
+    
+    // Custom error message for digits
+    let errorMsg = '';
+    if (value.length > 0 && expectedLength && value.length < expectedLength) {
+        errorMsg = `${toPersianDigits(expectedLength - value.length)} رقم دیگر وارد کنید`;
+    }
+    if (isMobile && value.length > 0 && !value.startsWith('09')) {
+        errorMsg = 'شماره موبایل باید با ۰۹ شروع شود';
+    }
+    
+    // Combined error from prop and live validation
+    const showError = hasError || !!errorMsg;
+
     return (
-        <div className={`glass-card p-3 rounded-2xl border transition-colors ${hasError ? 'border-red-500 bg-red-50 dark:bg-red-900/10' : 'border-slate-300 dark:border-luxury-600 focus-within:border-luxury-500'}`}>
+        <div className={`glass-card p-3 rounded-2xl border transition-colors ${showError ? 'border-red-500 bg-red-50 dark:bg-red-900/10' : 'border-slate-300 dark:border-luxury-600 focus-within:border-luxury-500'}`}>
             <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">{label}</label>
             <div className="relative">
                 <input 
@@ -324,11 +334,15 @@ const ValidationInput = ({ label, value, onChange, placeholder, hasError, expect
                     onBlur={onBlur}
                     placeholder={placeholder}
                 />
-                {expectedLength === 10 && value.length === 10 && (
+                {expectedLength && value.length === expectedLength && (!isMobile || value.startsWith('09')) && (
                     <div className="absolute top-1/2 -translate-y-1/2 right-0 text-emerald-500 animate-pulse"><Search className="w-5 h-5" /></div>
                 )}
             </div>
-            {hasError && <span className="text-xs text-red-500 font-bold mt-1 block">فرمت وارد شده صحیح نیست</span>}
+            {errorMsg ? (
+                 <span className="text-xs text-red-500 font-bold mt-1 block">{errorMsg}</span>
+            ) : hasError ? (
+                 <span className="text-xs text-red-500 font-bold mt-1 block">این فیلد الزامی است</span>
+            ) : null}
         </div>
     );
 };
@@ -377,6 +391,10 @@ const SurveyForm: React.FC<Props> = ({ source, initialData, onSuccess, surveyTyp
   const [submitted, setSubmitted] = useState(false);
   const [trackingId, setTrackingId] = useState<number>(0);
   const [errors, setErrors] = useState<Record<string, boolean>>({});
+  
+  // Ref for handling creating a NEW record vs Editing
+  // If true, even if data was autofilled, we create a new ID on save.
+  const isNewEntryRef = useRef(true);
 
   const backgroundMediaRecorder = useRef<MediaRecorder | null>(null);
   const backgroundChunks = useRef<Blob[]>([]);
@@ -397,6 +415,10 @@ const SurveyForm: React.FC<Props> = ({ source, initialData, onSuccess, surveyTyp
   useEffect(() => {
     getSettings().then(setSettings);
     if (initialData) {
+        // Only if initialData is provided via PROPS (like editing a draft), we treat it as editing.
+        // If we found data via search (autofill), isNewEntryRef remains true.
+        isNewEntryRef.current = false; 
+        
         setPatientInfo(initialData.patientInfo); setInsuranceInfo(initialData.insuranceInfo); setClinicalInfo(initialData.clinicalInfo); setDischargeInfo(initialData.dischargeInfo); setAnswers(initialData.answers); setWard(initialData.ward);
         if (initialData.audioFiles) {
             const normalizedAudio: Record<string, string[]> = {};
@@ -451,19 +473,21 @@ const SurveyForm: React.FC<Props> = ({ source, initialData, onSuccess, surveyTyp
   const convertPersianToEnglish = (str: string) => { if (!str) return ''; return str.replace(/[۰-۹]/g, d => '0123456789'['۰۱۲۳۴۵۶۷۸۹'.indexOf(d)]); };
   
   const handleNationalIdBlur = async () => {
-      // Logic: Only allow search if user is 'farid' or 'admin'
-      const username = localStorage.getItem('user_username');
-      const role = localStorage.getItem('user_role');
-      const canSearch = username === 'farid' || role === 'admin';
-
-      if (source === 'staff' && canSearch) { 
-          const nid = convertPersianToEnglish(patientInfo.nationalId);
-          if (nid.length === 10) {
-              const found = await findPatientByNationalId(nid);
-              if (found && window.confirm(`بیمار ${found.patientInfo.name} یافت شد. آیا اطلاعات جایگزین شود؟`)) {
-                  setPatientInfo({ ...patientInfo, name: found.patientInfo.name, gender: found.patientInfo.gender, birthDate: found.patientInfo.birthDate, mobile: found.patientInfo.mobile, address: found.patientInfo.address });
-                  setInsuranceInfo(found.insuranceInfo);
-              }
+      const nid = convertPersianToEnglish(patientInfo.nationalId);
+      if (nid.length === 10) {
+          const found = await findPatientByNationalId(nid);
+          if (found && window.confirm(`پرونده بیمار "${found.patientInfo.name}" یافت شد. آیا مایل به استفاده از اطلاعات موجود هستید؟ \n(با تایید، اطلاعات فردی و بیمه پر می‌شود و یک فرم جدید در پرونده ایشان ایجاد خواهد شد)`)) {
+              setPatientInfo({ 
+                  ...patientInfo, 
+                  name: found.patientInfo.name, 
+                  gender: found.patientInfo.gender, 
+                  birthDate: found.patientInfo.birthDate, 
+                  mobile: found.patientInfo.mobile, 
+                  address: found.patientInfo.address 
+              });
+              setInsuranceInfo(found.insuranceInfo);
+              // CRITICAL: We autofilled, but this MUST remain a NEW entry (creates sub-set in file)
+              isNewEntryRef.current = true; 
           }
       }
   };
@@ -531,8 +555,20 @@ const SurveyForm: React.FC<Props> = ({ source, initialData, onSuccess, surveyTyp
       });
   };
 
-  const handleSubmit = async (status: 'draft' | 'final') => {
-    if (status === 'final' && !validateForm()) { alert(source === 'staff' ? 'لطفا تمام فیلدهای اجباری را تکمیل کنید (شماره موبایل باید با ۰۹ شروع شود).' : 'لطفا شماره موبایل را صحیح وارد کنید (شروع با ۰۹).'); return; }
+  const handleSmartDraftSave = () => {
+      if (!validateStep1()) { alert('لطفا نام، کد ملی و موبایل را وارد کنید.'); return; }
+      
+      if (window.confirm("آیا بیمار نیاز به تکمیل فرم نظرسنجی دارد؟\n\nتایید (OK) = بله (ذخیره در پیش‌نویس برای تکمیل سوالات)\nلغو (Cancel) = خیر (ذخیره نهایی فقط اطلاعات دموگرافیک)")) {
+          // Yes -> Needs Survey -> Draft
+          handleSubmit('draft');
+      } else {
+          // No -> No Survey -> Final
+          handleSubmit('final', true); // true param to skip detailed validation
+      }
+  }
+
+  const handleSubmit = async (status: 'draft' | 'final', skipValidation = false) => {
+    if (!skipValidation && status === 'final' && !validateForm()) { alert(source === 'staff' ? 'لطفا تمام فیلدهای اجباری را تکمیل کنید (شماره موبایل باید با ۰۹ شروع شود).' : 'لطفا شماره موبایل را صحیح وارد کنید (شروع با ۰۹).'); return; }
     if (status === 'draft' && !validateStep1()) { alert('لطفا نام، کد ملی و موبایل را وارد کنید.'); return; }
 
     setIsSubmitting(true);
@@ -545,8 +581,12 @@ const SurveyForm: React.FC<Props> = ({ source, initialData, onSuccess, surveyTyp
 
         const username = localStorage.getItem('user_name') || (source === 'public' ? 'مراجعه کننده' : 'نامشخص');
         const registrarUsername = localStorage.getItem('user_role') === 'staff' ? localStorage.getItem('user_username') : undefined;
+        
+        // Use initialData.id ONLY if explicitly editing. Otherwise undefined to create new.
+        const idToUse = isNewEntryRef.current ? undefined : initialData?.id;
+
         const feedback: Partial<Feedback> = { 
-            id: initialData?.id, 
+            id: idToUse, 
             source, 
             surveyType, 
             status, 
@@ -562,25 +602,19 @@ const SurveyForm: React.FC<Props> = ({ source, initialData, onSuccess, surveyTyp
         };
         const result = await saveFeedback(feedback);
         
-        // Logic for Staff: If final submit, show success screen too (so they see tracking ID)
         if (status === 'final') { 
-            if (initialData) alert('ویرایش با موفقیت انجام شد');
+            if (!isNewEntryRef.current && initialData) alert('ویرایش با موفقیت انجام شد');
             setTrackingId(result.trackingId); 
             setSubmitted(true); 
             window.scrollTo(0,0);
         } else { 
-            // Draft
-            alert('اطلاعات اولیه با موفقیت ثبت شد.');
+            alert('اطلاعات با موفقیت ذخیره شد.');
             if (onSuccess) onSuccess(); 
         }
     } catch (e) { alert('خطا در ثبت'); } finally { setIsSubmitting(false); }
   };
 
   const renderStep1 = () => {
-    const username = localStorage.getItem('user_username');
-    const role = localStorage.getItem('user_role');
-    const canSearch = username === 'farid' || role === 'admin';
-
     return (
     <div className="space-y-4 animate-fade-in">
         <h3 className="text-2xl font-black text-slate-800 dark:text-white mb-6 flex items-center gap-2"><User className="w-8 h-8 text-blue-500"/> مشخصات فردی</h3>
@@ -591,7 +625,7 @@ const SurveyForm: React.FC<Props> = ({ source, initialData, onSuccess, surveyTyp
             
             <div className="md:col-span-4">
                 <ValidationInput 
-                    label={canSearch ? "کد ملی (جستجو)" : "کد ملی"} 
+                    label="کد ملی (جستجو)" 
                     value={patientInfo.nationalId} 
                     onChange={(v: string) => setPatientInfo({...patientInfo, nationalId: convertPersianToEnglish(v)})} 
                     expectedLength={10} 
@@ -623,7 +657,7 @@ const SurveyForm: React.FC<Props> = ({ source, initialData, onSuccess, surveyTyp
         {source === 'staff' && (
             <div className="mt-4 flex justify-end">
                 <button 
-                    onClick={() => handleSubmit('draft')} 
+                    onClick={handleSmartDraftSave} 
                     className="flex items-center gap-2 bg-teal-600 text-white px-6 py-3 rounded-2xl font-bold hover:bg-teal-700 transition-colors shadow-lg"
                 >
                     <UserCheck className="w-5 h-5"/> ثبت اطلاعات اولیه و خروج
@@ -783,8 +817,8 @@ const SurveyForm: React.FC<Props> = ({ source, initialData, onSuccess, surveyTyp
                     ) : (
                         <div className="flex gap-4">
                             {source === 'staff' && (
-                                <button onClick={() => handleSubmit('draft')} disabled={isSubmitting} className="bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 px-6 py-3 rounded-2xl font-bold hover:bg-orange-200 dark:hover:bg-orange-900/50 transition-colors disabled:opacity-50">
-                                    ذخیره موقت
+                                <button onClick={handleSmartDraftSave} disabled={isSubmitting} className="bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 px-6 py-3 rounded-2xl font-bold hover:bg-orange-200 dark:hover:bg-orange-900/50 transition-colors disabled:opacity-50">
+                                    ذخیره موقت / خروج
                                 </button>
                             )}
                             <button onClick={() => handleSubmit('final')} disabled={isSubmitting} className="flex items-center gap-2 bg-emerald-600 text-white px-8 py-3 rounded-2xl font-bold hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-500/30 disabled:opacity-50">
