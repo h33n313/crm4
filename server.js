@@ -16,7 +16,9 @@ const PORT = process.env.PORT || 4000;
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/crm_db';
 
 app.use(cors());
-app.use(express.json({ limit: '50mb' }));
+// INCREASED LIMIT FOR FULL BACKUPS
+app.use(express.json({ limit: '500mb' }));
+app.use(express.urlencoded({ limit: '500mb', extended: true }));
 app.use(express.static(path.join(__dirname, 'dist')));
 
 // --- Static Uploads Directory for TalkBot ---
@@ -259,6 +261,7 @@ app.post('/api/stt', upload.single('audioFile'), async (req, res) => {
                 file: fs.createReadStream(filePath),
                 model: 'whisper-large-v3',
                 language: 'fa', // Persian
+                prompt: 'این یک صدای ضبط شده فارسی است لطفا آن را دقیق به متن فارسی تبدیل کن', // Prompt helps guide the model
                 response_format: 'json'
             });
             transcription = transcriptionResponse.text;
@@ -647,6 +650,58 @@ app.post('/api/restore', async (req, res) => {
         res.status(500).json({ error: e.message });
     }
 });
+
+// --- NEW FULL SYSTEM BACKUP ENDPOINTS ---
+
+app.get('/api/full-backup', async (req, res) => {
+    try {
+        const settings = await SettingsModel.findOne();
+        const feedback = await FeedbackModel.find();
+        
+        // This JSON includes Base64 audio strings within the feedback objects
+        const backupData = {
+            timestamp: new Date().toISOString(),
+            settings: settings,
+            feedback: feedback
+        };
+        
+        res.json(backupData);
+    } catch (e) {
+        console.error("Full Backup Error:", e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.post('/api/full-restore', async (req, res) => {
+    try {
+        const { settings, feedback } = req.body;
+        
+        if (!settings && !feedback) {
+            return res.status(400).json({ error: "Invalid backup file format" });
+        }
+
+        // 1. Wipe current data
+        await SettingsModel.deleteMany({});
+        await FeedbackModel.deleteMany({});
+        
+        // 2. Insert new data
+        if (settings) {
+            // Remove _id to let Mongo generate new one or use provided if strictly needed
+            // Ideally we keep the structure. Mongoose create handles object input.
+            await SettingsModel.create(settings);
+        }
+        
+        if (feedback && Array.isArray(feedback) && feedback.length > 0) {
+            await FeedbackModel.insertMany(feedback);
+        }
+
+        res.json({ message: "Full system restore successful" });
+    } catch (e) {
+        console.error("Full Restore Error:", e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
 
 app.get('/api/health', (req, res) => {
     if (mongoose.connection.readyState === 1) {

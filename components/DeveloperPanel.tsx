@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { Settings, SurveyQuestion, AppUser } from '../types';
-import { getSettings, saveSettings, backupData, restoreData, checkHealth, getSystemLogs, logAction } from '../services/dataService';
-import { Download, Upload, Settings as SettingsIcon, UserPlus, Trash2, Edit2, Key, List, Plus, ArrowUp, ArrowDown, CheckSquare, Square, Palette, Wifi, WifiOff, FileText, Activity, QrCode, Cpu, Check, Mic, Brain, Languages, Globe, Bot, Zap, Sparkles } from 'lucide-react';
+import { getSettings, saveSettings, backupData, restoreData, checkHealth, getSystemLogs, logAction, performFullBackup, performFullRestore } from '../services/dataService';
+import { Download, Upload, Settings as SettingsIcon, UserPlus, Trash2, Edit2, Key, List, Plus, ArrowUp, ArrowDown, CheckSquare, Square, Palette, Wifi, WifiOff, FileText, Activity, QrCode, Cpu, Check, Mic, Brain, Languages, Globe, Bot, Zap, Sparkles, HardDrive } from 'lucide-react';
 // @ts-ignore
 import * as XLSX from 'xlsx';
 import Header from './Header';
@@ -33,6 +33,10 @@ const DeveloperPanel: React.FC = () => {
     
     const [editingUser, setEditingUser] = useState<Partial<AppUser> | null>(null);
     const [showUserModal, setShowUserModal] = useState(false);
+    
+    // Backup State
+    const [isBackingUp, setIsBackingUp] = useState(false);
+    const [isRestoring, setIsRestoring] = useState(false);
 
     const AVAILABLE_ICONS = ['Stethoscope', 'Activity', 'Thermometer', 'Heart', 'Pill', 'ShieldPlus', 'Syringe', 'Brain', 'Dna'];
 
@@ -289,8 +293,8 @@ const DeveloperPanel: React.FC = () => {
         wb.Views = [{ RTL: true }];
         XLSX.utils.book_append_sheet(wb, ws, "گزارش کامل");
         XLSX.writeFile(wb, "CRM_Backup_Full.xlsx");
-        logAction('INFO', 'پشتیبان‌گیری کامل اکسل انجام شد');
-        showMessage('فایل اکسل کامل دانلود شد');
+        logAction('INFO', 'پشتیبان‌گیری اکسل (Data Only) انجام شد');
+        showMessage('فایل اکسل دانلود شد');
     };
     
     const doRestore = (e: any) => {
@@ -305,6 +309,59 @@ const DeveloperPanel: React.FC = () => {
         };
         reader.readAsBinaryString(file);
     };
+
+    // --- NEW FULL BACKUP HANDLERS ---
+    const handleFullBackup = async () => {
+        if (!confirm('این عملیات تمام تنظیمات، فرم‌ها و فایل‌های صوتی را دانلود می‌کند. ممکن است کمی طول بکشد. ادامه می‌دهید؟')) return;
+        setIsBackingUp(true);
+        try {
+            const data = await performFullBackup();
+            const jsonString = JSON.stringify(data, null, 2);
+            const blob = new Blob([jsonString], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            const dateStr = new Date().toISOString().slice(0, 10);
+            link.download = `Full_Backup_${dateStr}.json`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            logAction('INFO', 'بکاپ کامل سیستم دانلود شد');
+            showMessage('بکاپ کامل با موفقیت دانلود شد');
+        } catch (e: any) {
+            alert('خطا در بکاپ‌گیری: ' + e.message);
+        } finally {
+            setIsBackingUp(false);
+        }
+    };
+
+    const handleFullRestore = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!e.target.files || !e.target.files[0]) return;
+        const file = e.target.files[0];
+
+        if (!confirm(`آیا مطمئن هستید؟ با بازیابی این فایل، تمام اطلاعات فعلی دیتابیس (شامل کاربران و فرم‌ها) حذف و با اطلاعات فایل جایگزین می‌شود!`)) {
+            e.target.value = '';
+            return;
+        }
+
+        setIsRestoring(true);
+        const reader = new FileReader();
+        reader.onload = async (evt: any) => {
+            try {
+                const json = JSON.parse(evt.target.result);
+                await performFullRestore(json);
+                logAction('WARN', 'بازگردانی کامل سیستم (Full Restore) انجام شد');
+                alert('سیستم با موفقیت بازیابی شد. صفحه رفرش می‌شود.');
+                window.location.reload();
+            } catch (err: any) {
+                alert('خطا در بازگردانی: فایل نامعتبر است یا حجم آن بسیار زیاد است. \n' + err.message);
+            } finally {
+                setIsRestoring(false);
+            }
+        };
+        reader.readAsText(file);
+    };
+
 
     if (!settings) return <div className="p-10 text-center text-slate-500 font-bold">در حال بارگذاری پنل...</div>;
 
@@ -422,6 +479,7 @@ const DeveloperPanel: React.FC = () => {
 
                         {activeTab === 'general' && (
                              <div className="glass-panel p-6 rounded-3xl animate-fade-in space-y-8">
+                                 {/* Settings content same as before */}
                                  <div>
                                     <label className="block mb-3 font-bold text-slate-700 dark:text-white text-lg">نام برند و سامانه</label>
                                     <input 
@@ -507,7 +565,7 @@ const DeveloperPanel: React.FC = () => {
                                                 </button>
                                             </div>
                                          </div>
-
+                                         {/* Other API Keys (Same as before) */}
                                          <div>
                                             <label className="block mb-2 font-bold text-slate-700 dark:text-slate-300 text-sm flex items-center gap-2"><Languages className="w-4 h-4"/> کلید API سرویس IOType (نویسه‌نگار)</label>
                                             <div className="flex gap-2">
@@ -622,13 +680,42 @@ const DeveloperPanel: React.FC = () => {
                         )}
 
                         {activeTab === 'backup' && (
-                            <div className="glass-panel p-6 rounded-3xl animate-fade-in flex flex-col gap-4">
+                            <div className="glass-panel p-6 rounded-3xl animate-fade-in flex flex-col gap-6">
                                 <h2 className="text-2xl font-black mb-4 dark:text-white">پشتیبان‌گیری و بازیابی</h2>
-                                <button onClick={doBackup} className="bg-blue-600 text-white p-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-blue-700"><Download/> دانلود نسخه پشتیبان (Excel)</button>
-                                <div className="relative border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl p-8 text-center hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
-                                    <input type="file" onChange={doRestore} className="absolute inset-0 opacity-0 cursor-pointer" accept=".xlsx" />
-                                    <Upload className="w-8 h-8 mx-auto text-slate-400 mb-2"/>
-                                    <p className="font-bold text-slate-600 dark:text-slate-300">برای بازیابی فایل اکسل را اینجا رها کنید</p>
+                                
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                    {/* Data Only Backup */}
+                                    <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700">
+                                        <h3 className="font-bold text-lg mb-3 flex items-center gap-2"><FileText className="w-5 h-5 text-blue-500"/> بکاپ داده‌ها (اکسل)</h3>
+                                        <div className="flex flex-col gap-3">
+                                            <button onClick={doBackup} className="bg-blue-600 text-white p-4 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-blue-700 text-sm"><Download className="w-4 h-4"/> دانلود فایل اکسل (فقط فرم‌ها)</button>
+                                            <div className="relative border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-xl p-4 text-center hover:bg-white dark:hover:bg-slate-800 transition-colors cursor-pointer">
+                                                <input type="file" onChange={doRestore} className="absolute inset-0 opacity-0 cursor-pointer" accept=".xlsx" />
+                                                <p className="font-bold text-xs text-slate-500 dark:text-slate-400">بازیابی از فایل اکسل</p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Full System Backup */}
+                                    <div className="p-4 bg-emerald-50 dark:bg-emerald-900/10 rounded-2xl border border-emerald-200 dark:border-emerald-800/50">
+                                        <h3 className="font-bold text-lg mb-3 flex items-center gap-2 text-emerald-800 dark:text-emerald-200"><HardDrive className="w-5 h-5"/> بکاپ کامل سیستم</h3>
+                                        <p className="text-xs text-emerald-700 dark:text-emerald-400 mb-3 leading-relaxed">شامل: تنظیمات، کاربران، فرم‌ها و <b>تمام فایل‌های صوتی</b> ضبط شده.</p>
+                                        <div className="flex flex-col gap-3">
+                                            <button 
+                                                onClick={handleFullBackup} 
+                                                disabled={isBackingUp}
+                                                className="bg-emerald-600 text-white p-4 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-emerald-700 text-sm disabled:opacity-70 disabled:cursor-wait"
+                                            >
+                                                {isBackingUp ? 'در حال دانلود...' : <><Download className="w-4 h-4"/> دانلود بکاپ کامل (JSON)</>}
+                                            </button>
+                                            <div className="relative border-2 border-dashed border-emerald-300 dark:border-emerald-700 rounded-xl p-4 text-center hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-colors cursor-pointer">
+                                                <input type="file" onChange={handleFullRestore} disabled={isRestoring} className="absolute inset-0 opacity-0 cursor-pointer" accept=".json" />
+                                                <p className="font-bold text-xs text-emerald-700 dark:text-emerald-400">
+                                                    {isRestoring ? 'در حال بازگردانی...' : 'بازیابی فایل JSON کامل'}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         )}
@@ -653,6 +740,7 @@ const DeveloperPanel: React.FC = () => {
             {showUserModal && editingUser && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
                     <div className="glass-panel w-full max-w-md p-6 rounded-3xl bg-white dark:bg-slate-900">
+                        {/* User Modal Content (Same as before) */}
                         <h3 className="text-xl font-black mb-6 dark:text-white">{editingUser.id ? 'ویرایش کاربر' : 'کاربر جدید'}</h3>
                         <div className="space-y-4">
                             <div><label className="block text-sm font-bold text-slate-500 mb-1">نام کامل</label><input className="w-full p-3 rounded-xl bg-slate-100 dark:bg-slate-800 outline-none" value={editingUser.name || ''} onChange={e=>setEditingUser({...editingUser, name:e.target.value})}/></div>
@@ -688,7 +776,8 @@ const DeveloperPanel: React.FC = () => {
 
             {showQuestionModal && editingQuestion && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
-                    <div className="glass-panel w-full max-w-lg p-6 rounded-3xl bg-white dark:bg-slate-900">
+                   {/* Question Modal Content (Same as before) */}
+                   <div className="glass-panel w-full max-w-lg p-6 rounded-3xl bg-white dark:bg-slate-900">
                         <h3 className="text-xl font-black mb-6 dark:text-white">{editingQuestion.id ? 'ویرایش سوال' : 'سوال جدید'}</h3>
                         <div className="space-y-4">
                             <div><label className="block text-sm font-bold text-slate-500 mb-1">متن سوال</label><textarea rows={3} className="w-full p-3 rounded-xl bg-slate-100 dark:bg-slate-800 outline-none" value={editingQuestion.text || ''} onChange={e=>setEditingQuestion({...editingQuestion, text:e.target.value})}/></div>

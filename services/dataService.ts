@@ -206,6 +206,24 @@ export const restoreData = async (data: any[]) => {
     }
 };
 
+// --- NEW FULL BACKUP SERVICES ---
+export const performFullBackup = async () => {
+    const res = await fetch('/api/full-backup');
+    if (!res.ok) throw new Error('Backup failed');
+    return await res.json();
+};
+
+export const performFullRestore = async (jsonData: any) => {
+    const res = await fetch('/api/full-restore', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(jsonData)
+    });
+    if (!res.ok) throw new Error('Restore failed');
+    return await res.json();
+};
+
+
 // --- Logs System ---
 
 export const logAction = (type: 'INFO' | 'WARN' | 'ERROR', message: string) => {
