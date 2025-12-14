@@ -142,6 +142,48 @@ const DeveloperPanel: React.FC = () => {
         }
     };
 
+    const testGroqApi = async () => {
+        setTestGroqStatus('loading');
+        try {
+            if(settings) await saveSettings(settings);
+            const res = await fetch('/api/test-groq', { method: 'POST' });
+            const data = await res.json();
+            if (res.ok) {
+                setTestGroqStatus('success');
+                showMessage('ارتباط با Groq موفقیت‌آمیز بود');
+            } else {
+                setTestGroqStatus('error');
+                alert('خطا در Groq: ' + (data.error || 'Unknown Error'));
+            }
+        } catch (e: any) {
+            setTestGroqStatus('error');
+            alert('خطای شبکه: ' + e.message);
+        } finally {
+            setTimeout(() => setTestGroqStatus('idle'), 3000);
+        }
+    };
+
+    const testGeminiApi = async () => {
+        setTestGeminiStatus('loading');
+        try {
+            if(settings) await saveSettings(settings);
+            const res = await fetch('/api/test-gemini', { method: 'POST' });
+            const data = await res.json();
+            if (res.ok) {
+                setTestGeminiStatus('success');
+                showMessage('ارتباط با Gemini موفقیت‌آمیز بود');
+            } else {
+                setTestGeminiStatus('error');
+                alert('خطا در Gemini: ' + (data.error || 'Unknown Error'));
+            }
+        } catch (e: any) {
+            setTestGeminiStatus('error');
+            alert('خطای شبکه: ' + e.message);
+        } finally {
+            setTimeout(() => setTestGeminiStatus('idle'), 3000);
+        }
+    };
+
     const saveUser = () => {
         if (!settings || !editingUser) return;
         if (!editingUser.username || !editingUser.name) return alert('نام و نام کاربری الزامی است');
@@ -514,6 +556,9 @@ const DeveloperPanel: React.FC = () => {
                                                     placeholder="gsk_..."
                                                     type="password"
                                                 />
+                                                 <button onClick={testGroqApi} disabled={testGroqStatus === 'loading'} className="px-4 rounded-xl font-bold text-white bg-teal-600 hover:bg-teal-700 min-w-[80px] flex items-center justify-center">
+                                                    {testGroqStatus === 'loading' ? '...' : <Check className="w-5 h-5"/>}
+                                                </button>
                                             </div>
                                          </div>
 
@@ -529,6 +574,9 @@ const DeveloperPanel: React.FC = () => {
                                                     placeholder="AIza..."
                                                     type="password"
                                                 />
+                                                <button onClick={testGeminiApi} disabled={testGeminiStatus === 'loading'} className="px-4 rounded-xl font-bold text-white bg-teal-600 hover:bg-teal-700 min-w-[80px] flex items-center justify-center">
+                                                    {testGeminiStatus === 'loading' ? '...' : <Check className="w-5 h-5"/>}
+                                                </button>
                                             </div>
                                          </div>
                                      </div>

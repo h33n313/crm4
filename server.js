@@ -274,7 +274,7 @@ app.post('/api/stt', upload.single('audioFile'), async (req, res) => {
             const mimeType = req.file.mimetype || 'audio/webm'; // Fallback
 
             const response = await ai.models.generateContent({
-                model: 'gemini-1.5-flash',
+                model: 'gemini-2.5-flash',
                 contents: [
                     {
                         parts: [
@@ -284,7 +284,7 @@ app.post('/api/stt', upload.single('audioFile'), async (req, res) => {
                     }
                 ]
             });
-            transcription = response.response.text();
+            transcription = response.text || "";
         } else {
             throw new Error('Invalid provider specified.');
         }
@@ -323,6 +323,45 @@ app.post('/api/test-openai', async (req, res) => {
         res.json({ message: 'Success', details: 'Connection OK' });
     } catch (e) {
         res.status(500).json({ error: e.response?.data?.error?.message || e.message });
+    }
+});
+
+app.post('/api/test-groq', async (req, res) => {
+    try {
+        const settings = await SettingsModel.findOne();
+        const apiKey = settings?.groqApiKey;
+        if (!apiKey) return res.status(400).json({ error: 'Groq API Key not configured' });
+
+        const groq = new Groq({ apiKey: apiKey });
+        const chatCompletion = await groq.chat.completions.create({
+            messages: [{ role: 'user', content: 'Ping' }],
+            model: 'llama3-8b-8192',
+        });
+
+        res.json({ message: 'Success', details: chatCompletion.choices[0]?.message?.content });
+    } catch (e) {
+        console.error("Groq Test Error:", e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.post('/api/test-gemini', async (req, res) => {
+    try {
+        const settings = await SettingsModel.findOne();
+        const apiKey = settings?.geminiApiKey;
+        if (!apiKey) return res.status(400).json({ error: 'Gemini API Key not configured' });
+
+        const { GoogleGenAI } = await import("@google/genai");
+        const ai = new GoogleGenAI({ apiKey: apiKey });
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: 'Ping',
+        });
+
+        res.json({ message: 'Success', details: response.text });
+    } catch (e) {
+        console.error("Gemini Test Error:", e);
+        res.status(500).json({ error: e.message });
     }
 });
 
@@ -641,4 +680,3 @@ process.on('SIGTERM', shutdown);
 process.on('SIGINT', shutdown);
 
 app.listen(PORT, '0.0.0.0', () => console.log(`🚀 Server running on port ${PORT}`));
-    
