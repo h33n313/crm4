@@ -9,7 +9,7 @@ const FormData = require('form-data');
 const fs = require('fs');
 const multer = require('multer');
 const Groq = require('groq-sdk');
-const { GoogleGenAI } = require("@google/genai");
+// REMOVED static require to fix ESM error: const { GoogleGenAI } = require("@google/genai");
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -264,6 +264,8 @@ app.post('/api/stt', upload.single('audioFile'), async (req, res) => {
             transcription = transcriptionResponse.text;
 
         } else if (provider === 'gemini') {
+            // Dynamic import for ESM package
+            const { GoogleGenAI } = await import("@google/genai");
             const ai = new GoogleGenAI({ apiKey: apiKey });
             
             // Read file buffer for Gemini
@@ -639,3 +641,4 @@ process.on('SIGTERM', shutdown);
 process.on('SIGINT', shutdown);
 
 app.listen(PORT, '0.0.0.0', () => console.log(`🚀 Server running on port ${PORT}`));
+    
