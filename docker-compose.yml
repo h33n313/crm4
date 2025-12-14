@@ -1,3 +1,4 @@
+
 version: '3.8'
 
 services:
@@ -7,8 +8,8 @@ services:
     restart: always
     ports:
       - "80:4000"
-    env_file:
-      - .env
     environment:
       - PORT=4000
       - MONGODB_URI=mongodb://hssncrm313:Hassancrm427726-@crm_database_crm003:27017/?tls=false
+    volumes:
+      - ./uploads:/app/uploads
