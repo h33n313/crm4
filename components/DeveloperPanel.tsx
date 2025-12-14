@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Settings, SurveyQuestion, AppUser } from '../types';
-import { getSettings, saveSettings, backupData, restoreData, checkHealth, getSystemLogs, logAction, performFullBackup, performFullRestore } from '../services/dataService';
+import { getSettings, saveSettings, backupData, restoreData, checkHealth, getSystemLogs, logAction, performFullRestore } from '../services/dataService';
 import { Download, Upload, Settings as SettingsIcon, UserPlus, Trash2, Edit2, Key, List, Plus, ArrowUp, ArrowDown, CheckSquare, Square, Palette, Wifi, WifiOff, FileText, Activity, QrCode, Cpu, Check, Mic, Brain, Languages, Globe, Bot, Zap, Sparkles, HardDrive } from 'lucide-react';
 // @ts-ignore
 import * as XLSX from 'xlsx';
@@ -35,7 +35,6 @@ const DeveloperPanel: React.FC = () => {
     const [showUserModal, setShowUserModal] = useState(false);
     
     // Backup State
-    const [isBackingUp, setIsBackingUp] = useState(false);
     const [isRestoring, setIsRestoring] = useState(false);
 
     const AVAILABLE_ICONS = ['Stethoscope', 'Activity', 'Thermometer', 'Heart', 'Pill', 'ShieldPlus', 'Syringe', 'Brain', 'Dna'];
@@ -310,29 +309,20 @@ const DeveloperPanel: React.FC = () => {
         reader.readAsBinaryString(file);
     };
 
-    // --- NEW FULL BACKUP HANDLERS ---
-    const handleFullBackup = async () => {
+    // --- NEW DIRECT DOWNLOAD HANDLER ---
+    // This bypasses the fetch -> blob -> download process which fails on large files/sandboxes
+    const handleFullBackup = () => {
         if (!confirm('این عملیات تمام تنظیمات، فرم‌ها و فایل‌های صوتی را دانلود می‌کند. ممکن است کمی طول بکشد. ادامه می‌دهید؟')) return;
-        setIsBackingUp(true);
-        try {
-            const data = await performFullBackup();
-            const jsonString = JSON.stringify(data, null, 2);
-            const blob = new Blob([jsonString], { type: "application/json" });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement("a");
-            link.href = url;
-            const dateStr = new Date().toISOString().slice(0, 10);
-            link.download = `Full_Backup_${dateStr}.json`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            logAction('INFO', 'بکاپ کامل سیستم دانلود شد');
-            showMessage('بکاپ کامل با موفقیت دانلود شد');
-        } catch (e: any) {
-            alert('خطا در بکاپ‌گیری: ' + e.message);
-        } finally {
-            setIsBackingUp(false);
-        }
+        
+        // Create a temporary hidden link and click it
+        const link = document.createElement("a");
+        link.href = "/api/full-backup";
+        link.target = "_blank"; // Optional: opens in new tab if needed, but for download usually triggers save
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        logAction('INFO', 'درخواست دانلود بکاپ کامل ارسال شد');
     };
 
     const handleFullRestore = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -548,6 +538,7 @@ const DeveloperPanel: React.FC = () => {
                                      </div>
 
                                      <div className="space-y-4">
+                                         {/* API Keys inputs - same as before */}
                                          <div>
                                             <label className="block mb-2 font-bold text-slate-700 dark:text-slate-300 text-sm flex items-center gap-2"><Brain className="w-4 h-4"/> کلید API اوپن‌ای‌آی (OpenAI)</label>
                                             <div className="flex gap-2">
@@ -703,10 +694,9 @@ const DeveloperPanel: React.FC = () => {
                                         <div className="flex flex-col gap-3">
                                             <button 
                                                 onClick={handleFullBackup} 
-                                                disabled={isBackingUp}
                                                 className="bg-emerald-600 text-white p-4 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-emerald-700 text-sm disabled:opacity-70 disabled:cursor-wait"
                                             >
-                                                {isBackingUp ? 'در حال دانلود...' : <><Download className="w-4 h-4"/> دانلود بکاپ کامل (JSON)</>}
+                                                <Download className="w-4 h-4"/> دانلود بکاپ کامل (JSON)
                                             </button>
                                             <div className="relative border-2 border-dashed border-emerald-300 dark:border-emerald-700 rounded-xl p-4 text-center hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-colors cursor-pointer">
                                                 <input type="file" onChange={handleFullRestore} disabled={isRestoring} className="absolute inset-0 opacity-0 cursor-pointer" accept=".json" />
