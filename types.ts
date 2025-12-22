@@ -81,7 +81,7 @@ export interface Settings {
   brandName: string;
   developerPassword?: string;
   iotypeApiKey?: string;
-  geminiApiKeys?: string[]; // Changed to array
+  geminiApiKeys?: string[]; 
   transcriptionMode?: 'iotype' | 'browser' | 'gemini';
   users: AppUser[];
   questions: SurveyQuestion[]; 
@@ -94,6 +94,7 @@ export enum TimeRange {
   MONTHLY = 'monthly',
   YEARLY = 'yearly',
   CUSTOM = 'custom',
+  ALL = 'all'
 }
 
 export interface SystemLog {
