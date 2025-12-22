@@ -14,7 +14,7 @@ const AdminDashboard: React.FC = () => {
   const [analytics, setAnalytics] = useState<any>(null);
   const [settings, setSettings] = useState<any>(null);
   
-  const [timeRange, setTimeRange] = useState<TimeRange>(TimeRange.ALL); // Changed default to ALL
+  const [timeRange, setTimeRange] = useState<TimeRange>(TimeRange.ALL); 
   const [filterSource, setFilterSource] = useState('All'); 
   const [search, setSearch] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -43,7 +43,6 @@ const AdminDashboard: React.FC = () => {
       const s = await getSettings();
       setSettings(s);
       const res = await getFeedbackData();
-      // Important: show everything final, don't over-filter here
       setData(res.filter(d => d.status === 'final'));
       setIsLoading(false);
   };
@@ -173,13 +172,11 @@ const AdminDashboard: React.FC = () => {
                   </div>
                   {!isEditing && (
                     <div className="p-4 border-t border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex justify-end gap-3">
-                        {!isReadOnlyAdmin ? (
+                        {!isReadOnlyAdmin && (
                             <>
                                 <button onClick={() => handleDelete(selectedPatient.id)} className="px-6 py-3 rounded-xl bg-red-100 text-red-600 font-bold hover:bg-red-200 flex items-center gap-2"><Trash2 className="w-5 h-5"/> حذف</button>
                                 <button onClick={() => setIsEditing(true)} className="px-6 py-3 rounded-xl bg-blue-600 text-white font-bold hover:bg-blue-700 flex items-center gap-2"><Edit className="w-5 h-5"/> ویرایش</button>
                             </>
-                        ) : (
-                            <p className="text-xs text-slate-400 font-bold self-center italic">شما دسترسی برای تغییر اطلاعات ندارید</p>
                         )}
                         <button onClick={() => setSelectedPatient(null)} className="px-6 py-3 rounded-xl bg-slate-200 dark:bg-slate-700 font-bold">بستن</button>
                     </div>
