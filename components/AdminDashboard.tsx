@@ -22,6 +22,10 @@ const AdminDashboard: React.FC = () => {
   const itemsPerPage = 10;
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
   
+  // Mahlouji Restriction Check
+  const currentUserUsername = localStorage.getItem('user_username');
+  const isReadOnlyAdmin = currentUserUsername === 'mahlouji';
+
   // View Mode: default or urgent
   const [viewMode, setViewMode] = useState<'default' | 'urgent'>('default');
   
@@ -31,7 +35,7 @@ const AdminDashboard: React.FC = () => {
   // Modal State
   const [selectedPatient, setSelectedPatient] = useState<Feedback | null>(null);
   const [isEditing, setIsEditing] = useState(false);
-  const [showNpsInfo, setShowNpsInfo] = useState(false); // New State for NPS Modal
+  const [showNpsInfo, setShowNpsInfo] = useState(false); 
 
   const currentJ = jalaali.toJalaali(new Date());
   const [sDate, setSDate] = useState({y: currentJ.jy, m: currentJ.jm, d: 1});
@@ -120,9 +124,7 @@ const AdminDashboard: React.FC = () => {
     setSortConfig({ key, direction });
   };
 
-  // Grouping Logic
   const groupedData = useMemo(() => {
-      // 1. First, sort if needed, or default sort by date desc
       let sorted = [...filteredData];
       if (viewMode === 'urgent') {
           sorted = analytics?.urgentList || [];
@@ -140,11 +142,8 @@ const AdminDashboard: React.FC = () => {
           sorted.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       }
 
-      // 2. Group by National ID
-      // Structure: [ { main: item, children: [item, item] }, { main: item, children: [] } ]
-      // We process linearly. If an item's national ID has been seen, add to that group.
       const groups: { main: Feedback, children: Feedback[] }[] = [];
-      const nidMap = new Map<string, number>(); // nid -> index in groups
+      const nidMap = new Map<string, number>(); 
 
       sorted.forEach(item => {
           const nid = item.patientInfo.nationalId;
@@ -175,7 +174,6 @@ const AdminDashboard: React.FC = () => {
       setExpandedGroups(newSet);
   };
 
-  // Helpers
   const calculateAgeDetails = (birthDate: string) => {
       if (!birthDate) return { text: '-', val: -1 };
       try {
@@ -194,16 +192,6 @@ const AdminDashboard: React.FC = () => {
       } catch { return { text: '-', val: -1 }; }
   };
 
-  const calculateDuration = (admission: string, discharge?: string) => {
-      if (!admission || !discharge) return '-';
-      try {
-          const days1 = dateToAbsoluteDays(admission);
-          const days2 = dateToAbsoluteDays(discharge);
-          const diff = Math.max(0, days2 - days1);
-          return diff === 0 ? 'کمتر از ۱ روز' : toPersianDigits(diff) + ' روز';
-      } catch { return '-'; }
-  };
-
   const formatDate = (isoString: string) => {
       if (!isoString) return ['-', ''];
       const parts = new Date(isoString).toLocaleString('fa-IR', {
@@ -214,6 +202,7 @@ const AdminDashboard: React.FC = () => {
   };
 
   const handleDelete = async (id: string) => {
+      if(isReadOnlyAdmin) return;
       if(confirm('آیا از حذف این رکورد اطمینان دارید؟')) {
           await deleteFeedback(id);
           const user = localStorage.getItem('user_name') || 'Admin';
@@ -225,6 +214,7 @@ const AdminDashboard: React.FC = () => {
   };
 
   const handleDeleteAudio = async (feedbackId: string, key: string, index: number) => {
+      if(isReadOnlyAdmin) return;
       if (!confirm('آیا از حذف این فایل صوتی اطمینان دارید؟')) return;
       const item = data.find(d => d.id === feedbackId);
       if (!item || !item.audioFiles || !item.audioFiles[key]) return;
@@ -248,7 +238,9 @@ const AdminDashboard: React.FC = () => {
                   <div key={i} className="flex items-center gap-2">
                       <span className="text-xs bg-blue-200 text-blue-800 rounded-full px-2 py-0.5">{i+1}</span>
                       <audio controls src={s} className="w-full h-8" />
-                      <button onClick={() => handleDeleteAudio(feedbackId, key, i)} className="p-1.5 bg-red-100 hover:bg-red-200 text-red-600 rounded-full transition-colors"><Trash2 className="w-4 h-4"/></button>
+                      {!isReadOnlyAdmin && (
+                          <button onClick={() => handleDeleteAudio(feedbackId, key, i)} className="p-1.5 bg-red-100 hover:bg-red-200 text-red-600 rounded-full transition-colors"><Trash2 className="w-4 h-4"/></button>
+                      )}
                   </div>
               ))}
           </div>
@@ -329,7 +321,23 @@ const AdminDashboard: React.FC = () => {
                           </div>
                       )}
                   </div>
-                  {!isEditing && <div className="p-4 border-t border-slate-100 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800/80 flex justify-end gap-3 backdrop-blur-md sticky bottom-0 z-10 no-print"><button onClick={() => handleDelete(selectedPatient.id)} className="px-6 py-3 rounded-xl bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400 font-bold hover:bg-red-200 flex items-center gap-2"><Trash2 className="w-5 h-5"/> حذف پرونده</button><button onClick={() => setIsEditing(true)} className="px-6 py-3 rounded-xl bg-blue-600 text-white font-bold hover:bg-blue-700 flex items-center gap-2"><Edit className="w-5 h-5"/> ویرایش پرونده</button></div>}
+                  {!isEditing && (
+                    <div className="p-4 border-t border-slate-100 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800/80 flex justify-end gap-3 backdrop-blur-md sticky bottom-0 z-10 no-print">
+                        {!isReadOnlyAdmin && (
+                            <>
+                                <button onClick={() => handleDelete(selectedPatient.id)} className="px-6 py-3 rounded-xl bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400 font-bold hover:bg-red-200 flex items-center gap-2">
+                                    <Trash2 className="w-5 h-5"/> حذف پرونده
+                                </button>
+                                <button onClick={() => setIsEditing(true)} className="px-6 py-3 rounded-xl bg-blue-600 text-white font-bold hover:bg-blue-700 flex items-center gap-2">
+                                    <Edit className="w-5 h-5"/> ویرایش پرونده
+                                </button>
+                            </>
+                        )}
+                        {isReadOnlyAdmin && (
+                            <button onClick={() => setSelectedPatient(null)} className="px-6 py-3 rounded-xl bg-slate-200 dark:bg-slate-700 font-bold">بستن</button>
+                        )}
+                    </div>
+                  )}
               </div>
           </div>
       )}
@@ -363,7 +371,6 @@ const AdminDashboard: React.FC = () => {
               </div>
           )}
 
-          {/* Table */}
           <div className="glass-panel rounded-3xl overflow-hidden shadow-xl border border-white/50 dark:border-white/10 relative print-only" ref={tableRef}>
                <div className="p-4 bg-slate-50 dark:bg-slate-800 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center no-print">
                    <h2 className="font-bold text-slate-700 dark:text-white flex items-center gap-2">{viewMode === 'urgent' && <AlertTriangle className="w-5 h-5 text-red-500" />}{viewMode === 'urgent' ? 'لیست پیگیری‌های فوری' : 'لیست پرونده‌ها'}</h2>
@@ -381,7 +388,6 @@ const AdminDashboard: React.FC = () => {
                                <SortableHeader label="سن" sortKey="age" currentSort={sortConfig} onSort={handleSort} center />
                                <SortableHeader label="بخش" sortKey="ward" currentSort={sortConfig} onSort={handleSort} />
                                <SortableHeader label="پزشک" sortKey="clinicalInfo.doctor" currentSort={sortConfig} onSort={handleSort} />
-                               {/* Only show questions for Main Row or Expanded? */}
                                {questions.map((q: any) => (<th key={q.id} className="p-5 min-w-[200px] text-xs opacity-70 border-r border-slate-200 dark:border-slate-700" title={q.text}>{q.text.length > 30 ? q.text.substring(0,30)+'...' : q.text}</th>))}
                                <SortableHeader label="تاریخ ثبت" sortKey="createdAt" currentSort={sortConfig} onSort={handleSort} center />
                                <SortableHeader label="ثبت کننده" sortKey="registrarName" currentSort={sortConfig} onSort={handleSort} />
@@ -397,7 +403,6 @@ const AdminDashboard: React.FC = () => {
                                
                                return (
                                <React.Fragment key={item.id}>
-                                   {/* Main Row */}
                                    <tr onClick={() => setSelectedPatient(item)} className={`border-t border-slate-100 dark:border-slate-700/50 transition-colors group cursor-pointer ${rowClass}`}>
                                        <td className="p-5 text-center text-slate-400">
                                             {(currentPage - 1) * itemsPerPage + index + 1}
@@ -405,7 +410,6 @@ const AdminDashboard: React.FC = () => {
                                                 <button 
                                                     onClick={(e) => { e.stopPropagation(); toggleGroup(item.patientInfo.nationalId); }} 
                                                     className="mt-1 p-1 bg-slate-200 rounded hover:bg-slate-300 mx-auto block"
-                                                    title="مشاهده سوابق"
                                                 >
                                                     {isExpanded ? <ChevronUp className="w-3 h-3"/> : <ChevronDown className="w-3 h-3"/>}
                                                 </button>
@@ -422,7 +426,6 @@ const AdminDashboard: React.FC = () => {
                                        <td className="p-5"><span className={`flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold w-fit ${item.source === 'public' ? 'bg-purple-100 text-purple-600' : 'bg-blue-100 text-blue-600'}`}><User className="w-3 h-3"/>{item.registrarName || 'نامشخص'}</span></td>
                                    </tr>
 
-                                   {/* Child Rows (History) */}
                                    {isExpanded && group.children.map((child, cIdx) => (
                                        <tr key={child.id} onClick={() => setSelectedPatient(child)} className="bg-slate-50 dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-700 hover:bg-slate-100 cursor-pointer">
                                            <td className="p-5 text-center text-slate-400 border-r-4 border-blue-400 bg-blue-50/30"></td>
@@ -453,14 +456,12 @@ const AdminDashboard: React.FC = () => {
                    </div>
                )}
           </div>
-          
-          {/* Charts & Analytics components remain here (omitted for brevity, assume same as before) */}
       </div>
     </div>
   );
 };
 
-// Render Helper
+// Render Helpers
 const renderSimpleAnswer = (q: any, val: any) => {
     if (val === undefined || val === null) return <span className="text-slate-300">-</span>;
     if (q.type === 'yes_no') return val ? <span className="text-emerald-500 font-bold">بله</span> : <span className="text-red-500 font-bold">خیر</span>;

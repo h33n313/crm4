@@ -422,14 +422,14 @@ const DeveloperPanel: React.FC = () => {
                                              </div>
                                              <div className="space-y-2">
                                                  {(settings.geminiApiKeys || []).map((key, idx) => (
-                                                     <div key={idx} className="flex gap-2">
+                                                     <div key={idx} className="flex gap-2 group animate-fade-in">
                                                          <input 
                                                             className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm font-mono dark:text-white outline-none focus:border-blue-500 text-left dir-ltr" 
                                                             dir="ltr" 
                                                             value={key} 
                                                             onChange={e => updateGeminiKey(idx, e.target.value)}
                                                             onBlur={() => handleSave(settings)}
-                                                            placeholder={`کلید ${idx + 1}`} 
+                                                            placeholder={`کلید Gemini شماره ${idx + 1}`} 
                                                             type="password"
                                                          />
                                                          <button onClick={() => removeGeminiKey(idx)} className="text-red-500 bg-red-100 dark:bg-red-900/30 p-3 rounded-xl hover:bg-red-200 dark:hover:bg-red-800 transition-colors"><Trash2 className="w-5 h-5"/></button>
@@ -437,11 +437,14 @@ const DeveloperPanel: React.FC = () => {
                                                  ))}
                                                  {(settings.geminiApiKeys || []).length > 0 && (
                                                      <div className="flex justify-end mt-2">
-                                                         <button onClick={testGeminiApi} disabled={testGeminiStatus === 'loading'} className="px-4 py-2 rounded-xl font-bold text-white bg-teal-600 hover:bg-teal-700 flex items-center gap-2 text-sm">{testGeminiStatus === 'loading' ? 'در حال تست...' : 'تست و ذخیره همه'}</button>
+                                                         <button onClick={testGeminiApi} disabled={testGeminiStatus === 'loading'} className="px-4 py-2 rounded-xl font-bold text-white bg-teal-600 hover:bg-teal-700 flex items-center gap-2 text-sm shadow-md transition-all">
+                                                             {testGeminiStatus === 'loading' ? <Cpu className="w-4 h-4 animate-spin"/> : <Zap className="w-4 h-4"/>}
+                                                             تست و عیب‌یابی کلیدها
+                                                         </button>
                                                      </div>
                                                  )}
                                              </div>
-                                             <p className="text-xs text-slate-500 mt-2">سیستم به ترتیب از کلیدها استفاده می‌کند. اگر یکی خطا دهد، کلید بعدی امتحان می‌شود.</p>
+                                             <p className="text-xs text-slate-500 mt-2 leading-relaxed">سیستم به ترتیب از کلیدها استفاده می‌کند. در صورت ایجاد خطا (محدودیت یا خرابی)، به صورت خودکار کلید بعدی جایگزین می‌شود.</p>
                                          </div>
                                      </div>
                                  </div>
@@ -512,7 +515,6 @@ const DeveloperPanel: React.FC = () => {
                 </div>
             </div>
 
-            {/* User Edit Modal & Question Modal remain same */}
             {showUserModal && editingUser && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
                     <div className="glass-panel w-full max-w-md p-6 rounded-3xl bg-white dark:bg-slate-900">

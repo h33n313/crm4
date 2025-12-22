@@ -69,7 +69,7 @@ const SettingsSchema = new mongoose.Schema({
     brandName: String,
     developerPassword: String,
     iotypeApiKey: String,
-    geminiApiKeys: [String], // Changed to Array of Strings
+    geminiApiKeys: [String], 
     transcriptionMode: { type: String, default: 'iotype' },
     users: [UserSchema],
     questions: [QuestionSchema],
@@ -131,7 +131,7 @@ const DEFAULT_SETTINGS = {
     users: [
         { id: "admin1", username: "matlabi", name: "آقای مطلبی", role: "admin", title: "مدیر اصلی", order: 1, isPasswordEnabled: false, password: "", avatarColor: "bg-blue-600" },
         { id: "admin2", username: "kand", name: "آقای کاند", role: "admin", title: "مدیر اصلی", order: 2, isPasswordEnabled: false, password: "", avatarColor: "bg-indigo-600" },
-        { id: "admin3", username: "mahlouji", name: "آقای مهلوجی", role: "admin", title: "مسئول مالی", order: 3, isPasswordEnabled: false, password: "", avatarColor: "bg-teal-600" }, 
+        { id: "admin3", username: "mahlouji", name: "آقای مهلوجی", role: "admin", title: "مدیر اصلی", order: 3, isPasswordEnabled: false, password: "", avatarColor: "bg-teal-600" }, 
         { id: "staff1", username: "mostafavi", name: "آقای مصطفوی", role: "admin", title: "سوپروایزر", order: 4, isPasswordEnabled: false, password: "", avatarColor: "bg-cyan-600" },
         { id: "staff2", username: "farid", name: "خانم فرید", role: "staff", title: "پرسنل", order: 5, isPasswordEnabled: false, password: "", avatarColor: "bg-pink-500" },
         { id: "staff3", username: "sec", name: "منشی‌ها", role: "staff", title: "منشی بخش", order: 6, isPasswordEnabled: false, password: "", avatarColor: "bg-purple-500" }
@@ -237,10 +237,12 @@ app.post('/api/users/password', async (req, res) => {
         if (!currentUser || !targetUser) return res.status(404).json({error: 'User not found'});
 
         const isSelf = currentUser.id === targetUser.id;
-        const isManager = ['matlabi', 'kand', 'mahlouji'].includes(currentUser.username); 
+        // Mahlouji is NOT allowed to manage others, only matlabi, kand, and mostafavi (supervisor) can.
+        const isManager = ['matlabi', 'kand'].includes(currentUser.username); 
         const isSupervisor = ['mostafavi'].includes(currentUser.username);
         const isTargetStaff = !['matlabi', 'kand', 'mahlouji', 'mostafavi'].includes(targetUser.username); 
 
+        // Mahlouji can only edit self. Managers/Supervisors can edit self and target staff.
         const canEdit = isSelf || ((isManager || isSupervisor) && isTargetStaff);
 
         if (!canEdit) return res.status(403).json({ error: 'Permission denied' });
@@ -260,12 +262,12 @@ app.post('/api/users/password', async (req, res) => {
     }
 });
 
-// --- NEW STT ENDPOINT (GEMINI MULTI-KEY) ---
+// --- STT ENDPOINT (GEMINI MULTI-KEY) ---
 app.post('/api/stt', upload.single('audioFile'), async (req, res) => {
     const filePath = req.file?.path;
 
     try {
-        const { provider, apiKeys } = req.body; // Expecting array of keys
+        const { provider, apiKeys } = req.body; 
         if (!req.file || !provider || !apiKeys) {
             if (filePath) try { fs.unlinkSync(filePath); } catch (e) {}
             return res.status(400).json({ error: 'Missing audio file, provider, or API keys.' });
@@ -276,7 +278,6 @@ app.post('/api/stt', upload.single('audioFile'), async (req, res) => {
         if (provider === 'gemini') {
             const { GoogleGenAI } = await import("@google/genai");
             
-            // Handle Multiple Keys from Array
             let keys = [];
             try {
                 keys = typeof apiKeys === 'string' ? JSON.parse(apiKeys) : apiKeys;
@@ -311,12 +312,11 @@ app.post('/api/stt', upload.single('audioFile'), async (req, res) => {
                     if (response.text) {
                         transcription = response.text;
                         success = true;
-                        break; // Stop loop on success
+                        break; 
                     }
                 } catch (err) {
                     console.error(`Gemini Key Failed (${key.substring(0,6)}...):`, err.message);
                     lastError = err;
-                    // Continue to next key
                 }
             }
 

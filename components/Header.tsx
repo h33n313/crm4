@@ -15,7 +15,6 @@ const Header: React.FC<Props> = ({ title, showLogout }) => {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [isDark, setIsDark] = useState(false);
   
-  // Password Modal Logic
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [currentUser, setCurrentUser] = useState<AppUser | null>(null);
   const [allUsers, setAllUsers] = useState<AppUser[]>([]);
@@ -28,7 +27,6 @@ const Header: React.FC<Props> = ({ title, showLogout }) => {
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     
-    // Theme Logic: Default to Light unless specifically set to Dark in local storage
     const savedTheme = localStorage.getItem('theme');
     if (savedTheme === 'dark') {
         setIsDark(true);
@@ -69,7 +67,7 @@ const Header: React.FC<Props> = ({ title, showLogout }) => {
       if (user) {
           setCurrentUser(user);
           setAllUsers(settings.users);
-          setTargetUserId(user.id); // Default to self
+          setTargetUserId(user.id); 
           setShowPasswordModal(true);
       }
   };
@@ -89,16 +87,14 @@ const Header: React.FC<Props> = ({ title, showLogout }) => {
   const isHome = location.pathname === '/';
   const isSurvey = location.pathname.startsWith('/survey');
 
-  // Hierarchy Logic
+  // Hierarchy Logic: Mahlouji excluded from managing others
   const canManageOthers = currentUser && ['matlabi', 'kand', 'mostafavi'].includes(currentUser.username);
   
-  // Filter users that current user can edit
   const editableUsers = allUsers.filter(u => {
       if (!currentUser) return false;
-      if (u.id === currentUser.id) return true; // Self
+      if (u.id === currentUser.id) return true; 
       if (canManageOthers) {
-          // Managers/Supervisors can edit Staff
-          const isTargetStaff = !['matlabi', 'kand', 'mostafavi'].includes(u.username);
+          const isTargetStaff = !['matlabi', 'kand', 'mahlouji', 'mostafavi'].includes(u.username);
           return isTargetStaff;
       }
       return false;
@@ -107,7 +103,6 @@ const Header: React.FC<Props> = ({ title, showLogout }) => {
   return (
     <div className="sticky top-0 z-50 px-4 pt-4 pb-2 w-full no-print">
       
-      {/* Password Modal */}
       {showPasswordModal && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
               <div className="glass-panel w-full max-w-md p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-2xl">
@@ -117,7 +112,8 @@ const Header: React.FC<Props> = ({ title, showLogout }) => {
                   </h3>
                   
                   <div className="space-y-4">
-                      {canManageOthers && (
+                      {/* Only show select box if user has manager privileges AND more than 1 editable user */}
+                      {canManageOthers && editableUsers.length > 1 ? (
                           <div>
                               <label className="block text-sm font-bold text-slate-500 mb-1">انتخاب کاربر</label>
                               <select 
@@ -131,6 +127,10 @@ const Header: React.FC<Props> = ({ title, showLogout }) => {
                                       </option>
                                   ))}
                               </select>
+                          </div>
+                      ) : (
+                          <div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-xl">
+                              <p className="text-sm font-bold text-slate-500">تغییر رمز برای: <span className="text-slate-800 dark:text-white">{currentUser?.name}</span></p>
                           </div>
                       )}
 
