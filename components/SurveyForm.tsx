@@ -30,14 +30,12 @@ const VoiceRecorderInput: React.FC<VoiceInputProps> = ({ value, onChange, placeh
     const [isProcessing, setIsProcessing] = useState(false);
     const [recordings, setRecordings] = useState<string[]>([]);
     
-    // Load existing recordings on mount
     useEffect(() => {
         if (existingAudio) {
             setRecordings(Array.isArray(existingAudio) ? existingAudio : [existingAudio]);
         }
     }, [existingAudio]);
 
-    // Refs
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const audioChunksRef = useRef<Blob[]>([]);
     const recognitionRef = useRef<any>(null);
@@ -78,7 +76,6 @@ const VoiceRecorderInput: React.FC<VoiceInputProps> = ({ value, onChange, placeh
         setIsListening(true);
 
         try {
-            // Android compatibility: prioritize webm/opus or mp4
             let mimeType = '';
             if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
                 mimeType = 'audio/webm;codecs=opus';
@@ -113,22 +110,18 @@ const VoiceRecorderInput: React.FC<VoiceInputProps> = ({ value, onChange, placeh
                     setRecordings(newRecordings);
                     onAudioData(newRecordings);
 
-                    // Server-side Processing
                     if (transcriptionMode === 'iotype' || transcriptionMode === 'gemini') {
                         setIsProcessing(true);
                         try {
-                            // Unified STT handling
                             if (transcriptionMode === 'gemini') {
-                                // For Gemini, we upload the file via formData to the new endpoint
                                 const settings = await getSettings();
                                 const apiKeys = settings.geminiApiKeys || [];
                                 
                                 if (apiKeys.length === 0) throw new Error(`${transcriptionMode} API keys are missing.`);
 
                                 const formData = new FormData();
-                                formData.append('audioFile', audioBlob, 'audio.webm'); // Ensure filename extension matches mimetype roughly
+                                formData.append('audioFile', audioBlob, 'audio.webm'); 
                                 formData.append('provider', transcriptionMode);
-                                // Pass array as JSON string or handle on server if FormData supports array
                                 formData.append('apiKeys', JSON.stringify(apiKeys)); 
 
                                 const res = await fetch('/api/stt', {
@@ -144,7 +137,6 @@ const VoiceRecorderInput: React.FC<VoiceInputProps> = ({ value, onChange, placeh
                                     onChange(finalText);
                                 }
                             } else {
-                                // IOType handler (default fallback)
                                 const res = await fetch('/api/transcribe-iotype', {
                                     method: 'POST',
                                     headers: { 'Content-Type': 'application/json' },
@@ -173,7 +165,6 @@ const VoiceRecorderInput: React.FC<VoiceInputProps> = ({ value, onChange, placeh
 
             mediaRecorder.start();
 
-            // Browser Speech Recognition
             if (transcriptionMode === 'browser') {
                 const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
                 if (!SpeechRecognition) {
@@ -181,7 +172,7 @@ const VoiceRecorderInput: React.FC<VoiceInputProps> = ({ value, onChange, placeh
                 } else {
                     const recognition = new SpeechRecognition();
                     recognition.lang = 'fa-IR';
-                    recognition.continuous = false; // False is safer for mobile
+                    recognition.continuous = false; 
                     recognition.interimResults = true;
                     
                     recognition.onresult = (event: any) => {
@@ -207,7 +198,6 @@ const VoiceRecorderInput: React.FC<VoiceInputProps> = ({ value, onChange, placeh
 
                     recognition.onerror = (e: any) => {
                         console.error("Speech Recognition Error:", e);
-                        // Don't alert on 'no-speech' or 'aborted' as it spams
                         if (e.error === 'not-allowed') {
                             alert("دسترسی به میکروفون برای تبدیل متن مسدود است. (نیاز به HTTPS)");
                         }
@@ -262,7 +252,6 @@ const VoiceRecorderInput: React.FC<VoiceInputProps> = ({ value, onChange, placeh
                 </div>
             </div>
             
-            {/* Show audio list only if NOT public view */}
             {!isPublicView && recordings.length > 0 && (
                 <div className="mt-3 flex flex-wrap gap-2">
                     {recordings.map((rec, idx) => (
@@ -302,14 +291,29 @@ const Input = ({ label, value, onChange, placeholder, hasError, className }: any
     </div>
 );
 
+const DoctorSelect = ({ label, value, onChange, hasError }: any) => (
+    <div className={`glass-card p-3 rounded-2xl border transition-colors ${hasError ? 'border-red-500 bg-red-50 dark:bg-red-900/10' : 'border-slate-300 dark:border-luxury-600 focus-within:border-luxury-500'}`}>
+        <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">{label}</label>
+        <select 
+            className="w-full bg-transparent outline-none font-bold text-lg text-slate-800 dark:text-white cursor-pointer"
+            value={value}
+            onChange={e => onChange(e.target.value)}
+        >
+            <option value="" className="text-slate-400">انتخاب کنید...</option>
+            <option value="دکتر قهرمانی">دکتر قهرمانی</option>
+            <option value="دکتر مینایی">دکتر مینایی</option>
+        </select>
+        {hasError && <span className="text-xs text-red-500 font-bold mt-1 block">لطفا پزشک را انتخاب کنید</span>}
+    </div>
+);
+
 const ValidationInput = ({ label, value, onChange, placeholder, hasError, expectedLength, isMobile, onBlur }: any) => {
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const val = e.target.value.replace(/[^0-9]/g, ''); // Enforce numbers only
+        const val = e.target.value.replace(/[^0-9]/g, ''); 
         if (expectedLength && val.length > expectedLength) return;
         onChange(val);
     }
     
-    // Custom error message for digits
     let errorMsg = '';
     if (value.length > 0 && expectedLength && value.length < expectedLength) {
         errorMsg = `${toPersianDigits(expectedLength - value.length)} رقم دیگر وارد کنید`;
@@ -318,7 +322,6 @@ const ValidationInput = ({ label, value, onChange, placeholder, hasError, expect
         errorMsg = 'شماره موبایل باید با ۰۹ شروع شود';
     }
     
-    // Combined error from prop and live validation
     const showError = hasError || !!errorMsg;
 
     return (
@@ -347,7 +350,6 @@ const ValidationInput = ({ label, value, onChange, placeholder, hasError, expect
     );
 };
 
-// Fixed Mobile UI for Date Input - Fully Responsive
 const PersianDateInput = ({ label, value, onChange, defaultYear = 1403, hasError, calculatedAge }: any) => {
     let y: number, m: number, d: number;
     if (value) { [y, m, d] = value.split('/').map(Number); } else { [y, m, d] = [defaultYear, 1, 1]; }
@@ -365,7 +367,6 @@ const PersianDateInput = ({ label, value, onChange, defaultYear = 1403, hasError
                 <label className="block text-sm font-bold text-slate-700 dark:text-slate-300">{label}</label>
                 {calculatedAge && <span className="text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/30 px-2 py-0.5 rounded">{calculatedAge}</span>}
             </div>
-            {/* Grid Layout for alignment on all screens */}
             <div className="grid grid-cols-[1fr_auto_1.2fr_auto_0.8fr] gap-1 items-center" dir="ltr">
                 <select value={y} onChange={e => update('y', +e.target.value)} className="bg-slate-100 dark:bg-slate-800 rounded-lg p-2 font-bold outline-none text-slate-800 dark:text-white text-center w-full appearance-none text-sm">
                     {Array.from({length: 100}, (_,i) => 1404-i).map(yr => <option key={yr} value={yr} className="dark:bg-slate-800">{toPersianDigits(yr)}</option>)}
@@ -392,8 +393,6 @@ const SurveyForm: React.FC<Props> = ({ source, initialData, onSuccess, surveyTyp
   const [trackingId, setTrackingId] = useState<number>(0);
   const [errors, setErrors] = useState<Record<string, boolean>>({});
   
-  // Ref for handling creating a NEW record vs Editing
-  // If true, even if data was autofilled, we create a new ID on save.
   const isNewEntryRef = useRef(true);
 
   const backgroundMediaRecorder = useRef<MediaRecorder | null>(null);
@@ -415,10 +414,7 @@ const SurveyForm: React.FC<Props> = ({ source, initialData, onSuccess, surveyTyp
   useEffect(() => {
     getSettings().then(setSettings);
     if (initialData) {
-        // Only if initialData is provided via PROPS (like editing a draft), we treat it as editing.
-        // If we found data via search (autofill), isNewEntryRef remains true.
         isNewEntryRef.current = false; 
-        
         setPatientInfo(initialData.patientInfo); setInsuranceInfo(initialData.insuranceInfo); setClinicalInfo(initialData.clinicalInfo); setDischargeInfo(initialData.dischargeInfo); setAnswers(initialData.answers); setWard(initialData.ward);
         if (initialData.audioFiles) {
             const normalizedAudio: Record<string, string[]> = {};
@@ -486,7 +482,6 @@ const SurveyForm: React.FC<Props> = ({ source, initialData, onSuccess, surveyTyp
                   address: found.patientInfo.address 
               });
               setInsuranceInfo(found.insuranceInfo);
-              // CRITICAL: We autofilled, but this MUST remain a NEW entry (creates sub-set in file)
               isNewEntryRef.current = true; 
           }
       }
@@ -559,11 +554,9 @@ const SurveyForm: React.FC<Props> = ({ source, initialData, onSuccess, surveyTyp
       if (!validateStep1()) { alert('لطفا نام، کد ملی و موبایل را وارد کنید.'); return; }
       
       if (window.confirm("آیا بیمار نیاز به تکمیل فرم نظرسنجی دارد؟\n\nتایید (OK) = بله (ذخیره در پیش‌نویس برای تکمیل سوالات)\nلغو (Cancel) = خیر (ذخیره نهایی فقط اطلاعات دموگرافیک)")) {
-          // Yes -> Needs Survey -> Draft
           handleSubmit('draft');
       } else {
-          // No -> No Survey -> Final
-          handleSubmit('final', true); // true param to skip detailed validation
+          handleSubmit('final', true); 
       }
   }
 
@@ -582,7 +575,6 @@ const SurveyForm: React.FC<Props> = ({ source, initialData, onSuccess, surveyTyp
         const username = localStorage.getItem('user_name') || (source === 'public' ? 'مراجعه کننده' : 'نامشخص');
         const registrarUsername = localStorage.getItem('user_role') === 'staff' ? localStorage.getItem('user_username') : undefined;
         
-        // Use initialData.id ONLY if explicitly editing. Otherwise undefined to create new.
         const idToUse = isNewEntryRef.current ? undefined : initialData?.id;
 
         const feedback: Partial<Feedback> = { 
@@ -620,7 +612,6 @@ const SurveyForm: React.FC<Props> = ({ source, initialData, onSuccess, surveyTyp
         <h3 className="text-2xl font-black text-slate-800 dark:text-white mb-6 flex items-center gap-2"><User className="w-8 h-8 text-blue-500"/> مشخصات فردی</h3>
         {surveyType && ( <div className="bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 p-4 rounded-2xl mb-4 font-bold text-center border border-blue-200 dark:border-blue-800"> {surveyType === 'inpatient' ? 'فرم نظرسنجی حین بستری' : 'فرم نظرسنجی حین ترخیص'} </div> )}
         <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
-            {/* Changed Order: Name First */}
             <div className="md:col-span-4"><Input label="نام و نام خانوادگی بیمار" value={patientInfo.name} onChange={(v: string) => setPatientInfo({...patientInfo, name: v})} hasError={errors['name']} /></div>
             
             <div className="md:col-span-4">
@@ -668,7 +659,39 @@ const SurveyForm: React.FC<Props> = ({ source, initialData, onSuccess, surveyTyp
   )};
 
   const renderStep2 = () => (<div className="space-y-6 animate-fade-in"><h3 className="text-2xl font-black text-slate-800 dark:text-white mb-6 flex items-center gap-2"><CreditCard className="w-8 h-8 text-indigo-500"/> وضعیت بیمه</h3><div className="glass-card p-6 rounded-3xl border border-slate-300 dark:border-luxury-600"><label className="block text-lg font-bold text-slate-800 dark:text-slate-200 mb-4">نوع بیمه</label><div className="grid grid-cols-2 gap-4">{[{id: 'SocialSecurity', l: 'تامین اجتماعی'}, {id: 'Supplementary', l: 'تکمیلی'},{id: 'Both', l: 'هر دو'}, {id: 'None', l: 'آزاد / سایر'}].map(opt => (<button key={opt.id} type="button" onClick={() => setInsuranceInfo({...insuranceInfo, type: opt.id as any})} className={`p-4 rounded-2xl border-2 font-bold transition-all ${insuranceInfo.type === opt.id ? 'border-indigo-500 bg-indigo-100 dark:bg-indigo-900/40 text-indigo-800 dark:text-white' : 'border-slate-300 dark:border-slate-700 text-slate-600'}`}>{opt.l}</button>))}</div><div className="mt-6"><Input label="نام بیمه (پایه و تکمیلی)" value={insuranceInfo.name} onChange={(v: string) => setInsuranceInfo({...insuranceInfo, name: v})} placeholder="مثال: دانا، آسیا..." hasError={errors['insuranceName']} /></div></div></div>);
-  const renderStep3 = () => (<div className="space-y-6 animate-fade-in"><h3 className="text-2xl font-black text-slate-800 dark:text-white mb-6 flex items-center gap-2"><Activity className="w-8 h-8 text-red-500"/> اطلاعات بالینی و جراحی</h3><div className="grid grid-cols-1 md:grid-cols-2 gap-6"><Input label="علت بستری" value={clinicalInfo.reason} onChange={(v: string) => setClinicalInfo({...clinicalInfo, reason: v})} hasError={errors['reason']} /><Input label="پزشک معالج" value={clinicalInfo.doctor} onChange={(v: string) => setClinicalInfo({...clinicalInfo, doctor: v})} hasError={errors['doctor']} /><div className="md:col-span-2 glass-card p-6 rounded-3xl border border-slate-300 dark:border-luxury-600"><div className="flex items-center justify-between mb-4"><label className="text-lg font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2"><Scissors className="w-5 h-5"/> آیا جراحی داشته است؟</label><div className="flex bg-slate-200 dark:bg-slate-800 rounded-xl p-1 w-40"><button type="button" onClick={() => setClinicalInfo({...clinicalInfo, hasSurgery: true})} className={`flex-1 py-2 rounded-lg font-bold transition-all ${clinicalInfo.hasSurgery ? 'bg-white dark:bg-luxury-600 shadow text-green-700 dark:text-white' : 'text-slate-500'}`}>بله</button><button type="button" onClick={() => setClinicalInfo({...clinicalInfo, hasSurgery: false})} className={`flex-1 py-2 rounded-lg font-bold transition-all ${!clinicalInfo.hasSurgery ? 'bg-white dark:bg-luxury-600 shadow text-red-700 dark:text-white' : 'text-slate-500'}`}>خیر</button></div></div>{clinicalInfo.hasSurgery && (<div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in"><Input label="نام جراح" value={clinicalInfo.surgeon || ''} onChange={(v: string) => setClinicalInfo({...clinicalInfo, surgeon: v})} hasError={errors['surgeon']} /><Input label="نوع عمل جراحی" value={clinicalInfo.surgeryType || ''} onChange={(v: string) => setClinicalInfo({...clinicalInfo, surgeryType: v})} hasError={errors['surgeryType']} /></div>)}</div></div></div>);
+  
+  const renderStep3 = () => (
+    <div className="space-y-6 animate-fade-in">
+        <h3 className="text-2xl font-black text-slate-800 dark:text-white mb-6 flex items-center gap-2"><Activity className="w-8 h-8 text-red-500"/> اطلاعات بالینی و جراحی</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Input label="علت بستری" value={clinicalInfo.reason} onChange={(v: string) => setClinicalInfo({...clinicalInfo, reason: v})} hasError={errors['reason']} />
+            
+            {/* Restricted Doctor Selection */}
+            <DoctorSelect 
+                label="پزشک معالج" 
+                value={clinicalInfo.doctor} 
+                onChange={(v: string) => setClinicalInfo({...clinicalInfo, doctor: v})} 
+                hasError={errors['doctor']} 
+            />
+            
+            <div className="md:col-span-2 glass-card p-6 rounded-3xl border border-slate-300 dark:border-luxury-600">
+                <div className="flex items-center justify-between mb-4">
+                    <label className="text-lg font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2"><Scissors className="w-5 h-5"/> آیا جراحی داشته است؟</label>
+                    <div className="flex bg-slate-200 dark:bg-slate-800 rounded-xl p-1 w-40">
+                        <button type="button" onClick={() => setClinicalInfo({...clinicalInfo, hasSurgery: true})} className={`flex-1 py-2 rounded-lg font-bold transition-all ${clinicalInfo.hasSurgery ? 'bg-white dark:bg-luxury-600 shadow text-green-700 dark:text-white' : 'text-slate-500'}`}>بله</button>
+                        <button type="button" onClick={() => setClinicalInfo({...clinicalInfo, hasSurgery: false})} className={`flex-1 py-2 rounded-lg font-bold transition-all ${!clinicalInfo.hasSurgery ? 'bg-white dark:bg-luxury-600 shadow text-red-700 dark:text-white' : 'text-slate-500'}`}>خیر</button>
+                    </div>
+                </div>
+                {clinicalInfo.hasSurgery && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in">
+                        <Input label="نام جراح" value={clinicalInfo.surgeon || ''} onChange={(v: string) => setClinicalInfo({...clinicalInfo, surgeon: v})} hasError={errors['surgeon']} />
+                        <Input label="نوع عمل جراحی" value={clinicalInfo.surgeryType || ''} onChange={(v: string) => setClinicalInfo({...clinicalInfo, surgeryType: v})} hasError={errors['surgeryType']} />
+                    </div>
+                )}
+            </div>
+        </div>
+    </div>
+  );
   
   const renderStep4 = () => (
     <div className="space-y-6 animate-fade-in">
@@ -684,7 +707,6 @@ const SurveyForm: React.FC<Props> = ({ source, initialData, onSuccess, surveyTyp
             {dischargeInfo.isDischarged && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-fade-in relative">
                     <div className="md:col-span-2">
-                        {/* Using the updated PersianDateInput with better mobile support */}
                         <PersianDateInput label="تاریخ ترخیص" value={dischargeInfo.date || ''} onChange={(v: string) => setDischargeInfo({...dischargeInfo, date: v})} hasError={errors['dischargeDate']}/>
                     </div>
                     {patientInfo.admissionDate && dischargeInfo.date && (
@@ -782,7 +804,6 @@ const SurveyForm: React.FC<Props> = ({ source, initialData, onSuccess, surveyTyp
             </div>
         ) : (
             <>
-                {/* Steps Indicator */}
                 <div className="flex justify-between mb-8 relative">
                     {[1,2,3,4,5].map(s => (
                          <div key={s} className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm relative z-10 transition-all duration-500 ${step >= s ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30' : 'bg-slate-200 dark:bg-slate-700 text-slate-400'}`}>
@@ -802,7 +823,6 @@ const SurveyForm: React.FC<Props> = ({ source, initialData, onSuccess, surveyTyp
                     {step === 5 && renderStep5()}
                 </form>
 
-                {/* Navigation Buttons */}
                 <div className="flex justify-between mt-8 pt-6 border-t border-slate-200 dark:border-slate-800">
                     {step > 1 ? (
                         <button onClick={() => setStep(s => s - 1)} className="flex items-center gap-2 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white font-bold px-6 py-3 transition-colors">

@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { ArrowUp, Activity, LogOut, Printer, QrCode, X, ExternalLink } from 'lucide-react';
+import { ArrowUp, Activity, LogOut, Printer, QrCode, X, ExternalLink, LogIn } from 'lucide-react';
 import Header from './Header';
 import Logo from './Logo';
 import { useNavigate } from 'react-router-dom';
@@ -108,6 +108,16 @@ const PublicHome: React.FC = () => {
   return (
     <div className="min-h-screen flex flex-col relative">
       <Header />
+
+      {/* Hero Entrance for Staff - Simplified Label */}
+      <div className="absolute top-20 left-4 z-40 no-print">
+          <button 
+            onClick={() => navigate('/login')}
+            className="flex items-center gap-2 bg-white/20 hover:bg-emerald-600 hover:text-white backdrop-blur-md px-4 py-2 rounded-full border border-white/30 text-slate-600 dark:text-slate-300 font-bold transition-all shadow-lg hover:scale-105"
+          >
+            <LogIn className="w-4 h-4" /> ورود
+          </button>
+      </div>
 
       {/* Main Content Area */}
       <div className="relative z-10 w-full max-w-5xl mx-auto px-4 pb-20 mt-12 flex-1 flex flex-col justify-center">
