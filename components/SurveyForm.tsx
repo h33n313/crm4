@@ -732,8 +732,20 @@ const SurveyForm: React.FC<Props> = ({ source, initialData, onSuccess, surveyTyp
   );
 
   const renderStep5 = () => {
-    const visibleQuestions = settings?.questions.filter((q: any) => { if (q.visibility === 'staff_only' && source !== 'staff') return false; if (surveyType && q.category && q.category !== 'all' && q.category !== surveyType) return false; return true; }) || [];
-    if (visibleQuestions.length === 0) return <div className="text-center py-10 font-bold">سوالات مربوطه یافت نشد</div>;
+    if (!settings) return <div className="flex flex-col items-center justify-center py-20 text-blue-600 dark:text-blue-400"><Loader className="w-12 h-12 animate-spin mb-4" /><p className="font-bold">در حال دریافت سوالات...</p></div>;
+    
+    const visibleQuestions = settings?.questions.filter((q: any) => { 
+        if (q.visibility === 'staff_only' && source !== 'staff') return false; 
+        if (surveyType && q.category && q.category !== 'all' && q.category !== surveyType) return false; 
+        return true; 
+    }) || [];
+
+    if (visibleQuestions.length === 0) return <div className="text-center py-20 bg-slate-50 dark:bg-slate-800/50 rounded-3xl border-2 border-dashed border-slate-300 dark:border-slate-700">
+        <AlertTriangle className="w-12 h-12 text-orange-500 mx-auto mb-4" />
+        <p className="text-xl font-black text-slate-800 dark:text-white">سوالی برای این دسته یافت نشد</p>
+        <p className="text-slate-500 mt-2">لطفاً از پنل مدیریت سوالات را بررسی کنید</p>
+    </div>;
+
     const sortedQuestions = visibleQuestions.sort((a: any, b: any) => a.order - b.order);
     return (
         <div className="space-y-8 animate-fade-in">

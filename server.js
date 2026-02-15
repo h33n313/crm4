@@ -1,3 +1,4 @@
+
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -78,6 +79,26 @@ const DEFAULT_SETTINGS = {
     ],
     questions: [
         { id: "q1", order: 1, type: "yes_no", text: "آیا آموزش‌های حین ترخیص به بیمار داده شده است؟", visibility: 'all', category: 'discharge' },
+        { id: "q2", order: 2, type: "yes_no", text: "آیا بیمار از نوع رژیم غذایی خود اطلاع دارد؟", visibility: 'all', category: 'discharge' },
+        { id: "q3", order: 3, type: "yes_no", text: "آیا بیمار از نحوه مصرف داروهای خود در منزل اطلاع دارد؟", visibility: 'all', category: 'discharge' },
+        { id: "q4", order: 4, type: "yes_no", text: "آیا بیمار وضعیت حرکتی خود در منزل را می‌داند؟", visibility: 'all', category: 'discharge' },
+        { id: "q5", order: 5, type: "yes_no", text: "آیا زمان و مکان مراجعه مجدد به پزشک را می‌دانید؟", visibility: 'all', category: 'discharge' },
+        { id: "q6", order: 6, type: "yes_no", text: "آیا مراقبت‌های لازم در منزل (زخم، عضو آسیب دیده و...) را می‌دانید؟", visibility: 'all', category: 'discharge' },
+        { id: "q7", order: 7, type: "yes_no", text: "(در صورت جراحی) آیا محل عمل فاقد قرمزی و ترشح است؟", visibility: 'all', category: 'discharge' },
+        { id: "q8", order: 8, type: "yes_no", text: "آیا آموزش و راهنمایی‌های ارائه شده واضح بود؟", visibility: 'all', category: 'all' },
+        { id: "q9", order: 9, type: "yes_no", text: "آیا اطلاعات ارائه شده توسط پزشکان کامل و قابل قبول بود؟", visibility: 'all', category: 'all' },
+        { id: "q10", order: 10, type: "yes_no", text: "آیا از آموزش‌های پزشک در بخش رضایت دارید؟", visibility: 'all', category: 'all' },
+        { id: "q11", order: 11, type: "yes_no", text: "آیا از آموزش‌های پرستار در بخش رضایت دارید؟", visibility: 'all', category: 'all' },
+        { id: "q12", order: 12, type: "yes_no", text: "آیا از اقدامات واحد پذیرش و توضیحات آن رضایت دارید؟", visibility: 'all', category: 'inpatient' },
+        { id: "q13", order: 13, type: "yes_no", text: "آیا از عملکرد اورژانس (از ورود تا بستری در بخش/ICU) رضایت دارید؟", visibility: 'all', category: 'inpatient' },
+        { id: "q14", order: 14, type: "yes_no", text: "آیا از واحد ترخیص و مالی و توضیحات آن رضایت دارید؟", visibility: 'all', category: 'discharge' },
+        { id: "q15", order: 15, type: "yes_no", text: "آیا به طور کلی از خدمات بیمارستان راضی بودید؟", visibility: 'all', category: 'discharge' },
+        { id: "q16", order: 16, type: "yes_no", text: "آیا نیاز به آموزش مجدد دارید؟", visibility: 'all', category: 'discharge' },
+        { id: "q17", order: 17, type: "yes_no", text: "آیا به ادامه پیگیری تلفنی تمایل دارید؟", visibility: 'all', category: 'all' },
+        { id: "q_cleaning", order: 18, type: "likert", text: "نظافت اتاق و سرویس", visibility: 'all', category: 'all' },
+        { id: "q_response", order: 19, type: "likert", text: "سرعت پاسخگویی به احضار", visibility: 'all', category: 'all' },
+        { id: "q_food", order: 20, type: "likert", text: "کیفیت غذای بیمار", visibility: 'all', category: 'all' },
+        { id: "q_nps", order: 21, type: "nps", text: "چقدر احتمال دارد این بیمارستان را به دیگران معرفی کنید؟", visibility: 'all', category: 'all' },
         { id: "q_comment", order: 22, type: "text", text: "نظرات و پیشنهادات تکمیلی", visibility: 'all', category: 'all' }
     ]
 };

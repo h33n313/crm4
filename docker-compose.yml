@@ -1,3 +1,4 @@
+
 version: '3.8'
 
 services:
@@ -11,7 +12,4 @@ services:
       - PORT=4000
       - MONGODB_URI=mongodb://hssncrm313:Hassancrm427726-@crm_database_crm003:27017/?tls=false
     volumes:
-      - uploads_data:/app/uploads
-
-volumes:
-  uploads_data:
+      - ./uploads:/app/uploads
